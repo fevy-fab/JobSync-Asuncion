@@ -445,37 +445,6 @@ export const ReviewSubmit: React.FC<ReviewSubmitProps> = ({
         )}
 
         <div className="space-y-3">
-          {/* Signature inclusion option for PDF export - Always visible */}
-          {(() => {
-            const hasSignature = !!(pdsData.otherInformation?.declaration?.signatureData || pdsData.otherInformation?.declaration?.signatureUrl);
-            return (
-              <div className={`border rounded-lg p-4 ${hasSignature ? 'bg-gray-50 border-gray-200' : 'bg-gray-100 border-gray-300'}`}>
-                <label className={`flex items-center gap-3 ${hasSignature ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                  <input
-                    type="checkbox"
-                    checked={includeSignature}
-                    onChange={(e) => setIncludeSignature(e.target.checked)}
-                    disabled={!hasSignature}
-                    className="w-4 h-4 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555] disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  <div className="flex-1">
-                    <span className={`text-sm font-medium ${hasSignature ? 'text-gray-900' : 'text-gray-500'}`}>
-                      Include digital signature in PDF
-                    </span>
-                    {hasSignature ? (
-                      <p className="text-xs text-gray-600 mt-0.5">
-                        Check this if submitting digitally. Leave unchecked for traditional wet signature.
-                      </p>
-                    ) : (
-                      <p className="text-xs text-orange-600 mt-0.5">
-                        ⚠ Complete the Declaration section (step 8) and add your signature first
-                      </p>
-                    )}
-                  </div>
-                </label>
-              </div>
-            );
-          })()}
 
           <Button
             variant="secondary"

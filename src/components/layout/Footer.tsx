@@ -27,7 +27,7 @@ export function Footer() {
             {/* Social Media Links */}
             <div className="flex items-center gap-3">
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/profile.php?id=61579844205611#"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-9 h-9 bg-gray-800 hover:bg-[#22A555] rounded-lg flex items-center justify-center transition-colors group"

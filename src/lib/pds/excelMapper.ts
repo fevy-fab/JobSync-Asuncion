@@ -14,7 +14,7 @@ export const SHEET_C1_MAPPING = {
     surname: 'D10',
     firstName: 'D11',
     middleName: 'D12',
-    nameExtension: 'L12', // JR., SR., III, etc.
+    nameExtension: 'N11',
 
     // Birth Information (Rows 13-15)
     dateOfBirth: 'D13',
@@ -119,6 +119,14 @@ export const SHEET_C1_MAPPING = {
     },
     maxRows: 5,
   },
+
+  // Declaration area on C1 (if ever needed)
+  declaration: {
+    date: 'L60',
+    signaturePlaceholder: 'D60',
+    // Optional range if you ever put a signature on C1
+    signatureRange: 'D60:H64',
+  },
 };
 
 /**
@@ -147,11 +155,17 @@ export const SHEET_C2_MAPPING = {
       to: 'C',
       positionTitle: 'D',
       department: 'G',
-     
       statusOfAppointment: 'J',
       govService: 'K',
     },
     maxRows: 28,
+  },
+
+  declaration: {
+    date: 'J47',
+    signaturePlaceholder: '',
+    // Not used right now for image injection, but kept for consistency
+    signatureRange: '',
   },
 };
 
@@ -206,19 +220,25 @@ export const SHEET_C3_MAPPING = {
     column: 'I',
     maxRows: 7,
   },
+
+  declaration: {
+    date: 'I50',
+    signaturePlaceholder: 'C50',
+    // Optional: if you ever decide to place a signature on C3
+    signatureRange: 'C50:G54',
+  },
 };
 
 /**
  * SHEET C4 - OTHER INFORMATION & QUESTIONS
  */
 export const SHEET_C4_MAPPING = {
-  
   // Questions 34-40
   questions: {
     // Q34a: Related within 3rd degree
     q34a_yes: '',
     q34a_no: '',
-    q34a_details: 'I11',
+    q34a_details: 'H11',
 
     // Q34b: Related within 4th degree (LGU)
     q34b_yes: '',
@@ -228,7 +248,7 @@ export const SHEET_C4_MAPPING = {
     // Q35a: Found guilty of administrative offense
     q35a_yes: '',
     q35a_no: '',
-    q35a_details: 'I15',
+    q35a_details: 'H15',
 
     // Q35b: Criminally charged
     q35b_yes: '',
@@ -240,12 +260,12 @@ export const SHEET_C4_MAPPING = {
     // Q36: Convicted of any crime
     q36_yes: '',
     q36_no: '',
-    q36_details: 'I25',
+    q36_details: 'H25',
 
     // Q37: Separated from service
     q37_yes: '',
     q37_no: '',
-    q37_details: 'I29',
+    q37_details: 'H29',
 
     // Q38a: Candidate in election
     q38a_yes: '',
@@ -260,7 +280,7 @@ export const SHEET_C4_MAPPING = {
     // Q39: Immigrant or permanent resident
     q39_yes: '',
     q39_no: '',
-    q39_country: 'I39',
+    q39_country: 'H39',
 
     // Q40a: Indigenous group member
     q40a_yes: '',
@@ -299,7 +319,10 @@ export const SHEET_C4_MAPPING = {
   // Declaration (Row 90+)
   declaration: {
     date: 'F64',
-    signaturePlaceholder: 'C92',
+    signaturePlaceholder: 'F60',
+    // This is the range used by pdsExcelGenerator to place the PNG
+    // Adjust columns/rows if the box size is different in your template.
+    signatureRange: 'F60:I62',
   },
 };
 
@@ -375,9 +398,9 @@ export function indicesToCellRef(row: number, col: number): string {
  */
 export const SHEET_NAMES = {
   C1: 'C1',
-  C2: 'C2', 
+  C2: 'C2',
   C3: 'C3',
-  C4: 'C4'
+  C4: 'C4',
 } as const;
 
 /**
@@ -390,8 +413,8 @@ export const TemplateValidator = {
   validateWorkbookStructure(workbook: any): boolean {
     const sheetNames = workbook.sheets().map((sheet: any) => sheet.name());
     const requiredSheets = Object.values(SHEET_NAMES);
-    
-    return requiredSheets.every(sheet => sheetNames.includes(sheet));
+
+    return requiredSheets.every((sheet) => sheetNames.includes(sheet));
   },
 
   /**
@@ -406,7 +429,7 @@ export const TemplateValidator = {
    */
   isValidRangeRef(ref: string): boolean {
     return /^[A-Z]+\d+:[A-Z]+\d+$/.test(ref);
-  }
+  },
 };
 
 /**
@@ -451,15 +474,15 @@ export const PDSDataTransformer = {
    */
   formatDate(dateString: string): string {
     if (!dateString) return '';
-    
+
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString;
-      
+
       const day = date.getDate().toString().padStart(2, '0');
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       const year = date.getFullYear();
-      
+
       return `${day}/${month}/${year}`;
     } catch {
       return dateString;
@@ -471,16 +494,16 @@ export const PDSDataTransformer = {
    */
   formatYear(dateString: string): string {
     if (!dateString) return '';
-    
+
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString;
-      
+
       return date.getFullYear().toString();
     } catch {
       return dateString;
     }
-  }
+  },
 };
 
 /**
@@ -501,11 +524,11 @@ export const CheckboxUtils = {
   setSex(workbook: any, sex: string): void {
     const sheet = workbook.sheet('C1');
     const mapping = SHEET_C1_MAPPING.personalInfo;
-    
+
     // Clear both first
     sheet.cell(mapping.sexMale).value(CHECKBOX.UNCHECKED);
     sheet.cell(mapping.sexFemale).value(CHECKBOX.UNCHECKED);
-    
+
     // Set the appropriate one
     if (sex === 'male') {
       sheet.cell(mapping.sexMale).value(CHECKBOX.CHECKED);
@@ -520,14 +543,14 @@ export const CheckboxUtils = {
   setCivilStatus(workbook: any, civilStatus: string): void {
     const sheet = workbook.sheet('C1');
     const mapping = SHEET_C1_MAPPING.personalInfo;
-    
+
     // Clear all first
     sheet.cell(mapping.civilStatusSingle).value(CHECKBOX.UNCHECKED);
     sheet.cell(mapping.civilStatusMarried).value(CHECKBOX.UNCHECKED);
     sheet.cell(mapping.civilStatusWidowed).value(CHECKBOX.UNCHECKED);
     sheet.cell(mapping.civilStatusSeparated).value(CHECKBOX.UNCHECKED);
     sheet.cell(mapping.civilStatusOthers).value(CHECKBOX.UNCHECKED);
-    
+
     // Set the appropriate one
     switch (civilStatus) {
       case 'single':
@@ -551,11 +574,17 @@ export const CheckboxUtils = {
   /**
    * Set yes/no question checkbox
    */
-  setYesNoQuestion(workbook: any, sheetName: string, yesCell: string, noCell: string, isYes: boolean): void {
+  setYesNoQuestion(
+    workbook: any,
+    sheetName: string,
+    yesCell: string,
+    noCell: string,
+    isYes: boolean
+  ): void {
     const sheet = workbook.sheet(sheetName);
     sheet.cell(yesCell).value(isYes ? CHECKBOX.CHECKED : CHECKBOX.UNCHECKED);
     sheet.cell(noCell).value(isYes ? CHECKBOX.UNCHECKED : CHECKBOX.CHECKED);
-  }
+  },
 };
 
 export default {
@@ -569,5 +598,5 @@ export default {
   SHEET_NAMES,
   TemplateValidator,
   PDSDataTransformer,
-  CheckboxUtils
+  CheckboxUtils,
 };

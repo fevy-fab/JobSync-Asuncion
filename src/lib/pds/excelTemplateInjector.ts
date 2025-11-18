@@ -4,6 +4,8 @@
  */
 
 import XlsxPopulate from 'xlsx-populate';
+import path from 'path';
+
 import {
   SHEET_C1_MAPPING,
   SHEET_C2_MAPPING,
@@ -15,7 +17,13 @@ import {
 } from './excelMapper';
 import type { PDSData } from '@/types/pds.types';
 
-const TEMPLATE_PATH = './public/templates/PDS_2025_Template.xlsx';
+// ✅ Build template path relative to project root so it works on Vercel
+const TEMPLATE_PATH = path.join(
+  process.cwd(),
+  'public',
+  'templates',
+  'PDS_2025_Template.xlsx'
+);
 
 type CellValue = string | number | boolean | Date | null | undefined;
 
@@ -30,10 +38,9 @@ interface XlsxSheet {
 }
 
 interface XlsxWorkbook {
-  sheet(name: string): XlsxSheet;
-  sheet(index: number): XlsxSheet;
+  sheet(nameOrIndex: string | number): XlsxSheet;
   sheets(): XlsxSheet[];
-  outputAsync(): Promise<Buffer>; // ✅ FIXED: xlsx-populate uses outputAsync()
+  outputAsync(): Promise<Buffer | ArrayBuffer | string>;
 }
 
 /**
@@ -42,14 +49,26 @@ interface XlsxWorkbook {
 export async function loadPDSTemplate(): Promise<XlsxWorkbook> {
   try {
     console.log('📂 Loading PDS template with xlsx-populate...');
+    console.log('   Template path:', TEMPLATE_PATH);
+
     const workbook = await XlsxPopulate.fromFileAsync(TEMPLATE_PATH);
+
     console.log('✅ PDS template loaded successfully');
-    console.log(`   Sheets found: ${workbook.sheets().map((s: XlsxSheet) => s.name()).join(', ')}`);
+    console.log(
+      `   Sheets found: ${workbook
+        .sheets()
+        .map((s: any) => s.name())
+        .join(', ')}`
+    );
+
+    // Cast to our minimal interface
     return workbook as unknown as XlsxWorkbook;
   } catch (error) {
     console.error('❌ Failed to load template:', error);
     throw new Error(
-      `Template loading failed: ${error instanceof Error ? error.message : String(error)}`
+      `Template loading failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`
     );
   }
 }
@@ -63,9 +82,9 @@ export function setCellValue(
   value: CellValue
 ): void {
   if (!cellRef) return;
-  
+
   const targetCell = firstCell(cellRef);
-  
+
   try {
     sheet.cell(targetCell).value(value ?? '');
   } catch (error) {
@@ -107,7 +126,7 @@ export function setYesNoCheckbox(
 }
 
 /**
- * Insert array data into worksheet
+ * Insert array data into worksheet (tabular sections)
  */
 export function insertArrayData<T extends Record<string, any>>(
   sheet: XlsxSheet,
@@ -119,7 +138,7 @@ export function insertArrayData<T extends Record<string, any>>(
   const itemsToInsert = dataArray.slice(0, maxRows);
 
   itemsToInsert.forEach((item, index) => {
-    const currentRow = startRow + index + 1; // +1 for 1-based Excel rows
+    const currentRow = startRow + index + 1; // +1 because Excel rows are 1-based
 
     Object.entries(columnMapping).forEach(([fieldName, columnLetter]) => {
       const cellRef = `${columnLetter}${currentRow}`;
@@ -131,7 +150,7 @@ export function insertArrayData<T extends Record<string, any>>(
   // Clear remaining rows
   for (let i = itemsToInsert.length; i < maxRows; i++) {
     const currentRow = startRow + i + 1;
-    
+
     Object.values(columnMapping).forEach((columnLetter) => {
       const cellRef = `${columnLetter}${currentRow}`;
       setCellValue(sheet, cellRef, '');
@@ -140,7 +159,7 @@ export function insertArrayData<T extends Record<string, any>>(
 }
 
 /**
- * Insert text array into single column
+ * Insert text array into single column (skills, recognitions, memberships)
  */
 export function insertTextArray(
   sheet: XlsxSheet,
@@ -150,16 +169,16 @@ export function insertTextArray(
   maxRows: number,
   separator: string = ', '
 ): void {
+  const columnLetter = firstColumn(column);
+
   if (!textArray || textArray.length === 0) {
     // Clear all rows
     for (let i = 0; i < maxRows; i++) {
-      const cellRef = `${column}${startRow + i + 1}`;
+      const cellRef = `${columnLetter}${startRow + i + 1}`;
       setCellValue(sheet, cellRef, '');
     }
     return;
   }
-
-  const columnLetter = firstColumn(column);
 
   if (textArray.length <= maxRows) {
     // Each item gets its own row
@@ -174,7 +193,7 @@ export function insertTextArray(
       setCellValue(sheet, cellRef, '');
     }
   } else {
-    // Overflow: combine items
+    // Overflow: combine items per row
     const itemsPerRow = Math.ceil(textArray.length / maxRows);
 
     for (let row = 0; row < maxRows; row++) {
@@ -204,7 +223,7 @@ export function setCivilStatusCheckbox(
   othersText?: string
 ): void {
   // Clear all first
-  Object.values(cellMapping).forEach(cellRef => {
+  Object.values(cellMapping).forEach((cellRef) => {
     setCheckbox(sheet, cellRef, false);
   });
 
@@ -223,7 +242,7 @@ export function setCivilStatusCheckbox(
   } else {
     setCheckbox(sheet, cellMapping.others, true);
     if (othersText) {
-      // Handle others text if needed
+      // If you ever map "Others, specify" text to a cell, handle it here
     }
   }
 }
@@ -258,7 +277,7 @@ export function setSexCheckbox(
 }
 
 /**
- * Set citizenship checkbox
+ * Set citizenship checkbox (Filipino / Dual by birth / Dual by naturalization)
  */
 export function setCitizenshipCheckbox(
   sheet: XlsxSheet,
@@ -295,7 +314,7 @@ export function setCitizenshipCheckbox(
 }
 
 /**
- * Format address components
+ * Format address components into a single string (mainly for debugging / fallback)
  */
 export function formatAddress(address: {
   houseBlockLotNo?: string;
@@ -320,21 +339,33 @@ export function formatAddress(address: {
 }
 
 /**
- * Get worksheet by name
+ * Get worksheet by name with helpful error if missing
  */
 export function getWorksheet(workbook: XlsxWorkbook, sheetName: string): XlsxSheet {
   const sheet = workbook.sheet(sheetName);
-  
+
   if (!sheet) {
-    throw new Error(`Sheet "${sheetName}" not found. Available: ${workbook.sheets().map((s: XlsxSheet) => s.name()).join(', ')}`);
+    throw new Error(
+      `Sheet "${sheetName}" not found. Available: ${workbook
+        .sheets()
+        .map((s: XlsxSheet) => s.name())
+        .join(', ')}`
+    );
   }
-  
+
   return sheet;
 }
 
 /**
- * Write workbook to buffer - FIXED for xlsx-populate
+ * Write workbook to Buffer (for download / further processing)
  */
 export async function writeWorkbookToBuffer(workbook: XlsxWorkbook): Promise<Buffer> {
-  return await workbook.outputAsync(); // ✅ FIXED: Use outputAsync() and await it
+  const out = await (workbook as any).outputAsync();
+
+  // xlsx-populate can return Buffer or ArrayBuffer; normalize to Node Buffer
+  if (Buffer.isBuffer(out)) return out;
+  if (out instanceof ArrayBuffer) return Buffer.from(out);
+
+  // Fallback: assume string (rare)
+  return Buffer.from(out as any);
 }

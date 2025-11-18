@@ -19,27 +19,39 @@ export const MonthlyApplicantsChart: React.FC = () => {
 
   const fetchMonthlyData = async () => {
     try {
-      // Fetch all applications
       const { data: applications, error } = await supabase
         .from('applications')
         .select('created_at');
 
-      if (error) throw error;
+      if (error) {
+        // Don’t throw, just log and bail
+        console.error('Supabase error fetching monthly data:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        setData([]);        // show “No data available”
+        return;
+      }
 
-      // Group by month
       const monthCounts: Record<string, number> = {};
 
-      applications?.forEach((app) => {
+      applications?.forEach((app: any) => {
         const date = new Date(app.created_at);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthKey = `${date.getFullYear()}-${String(
+          date.getMonth() + 1
+        ).padStart(2, '0')}`;
         monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
       });
 
-      // Convert to array and sort chronologically
       const monthlyData = Object.entries(monthCounts)
         .map(([monthKey, count]) => {
           const [year, month] = monthKey.split('-');
-          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const monthNames = [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+          ];
           return {
             month: `${monthNames[parseInt(month) - 1]} ${year}`,
             applications: count,
@@ -50,8 +62,8 @@ export const MonthlyApplicantsChart: React.FC = () => {
         .map(({ month, applications }) => ({ month, applications }));
 
       setData(monthlyData);
-    } catch (error) {
-      console.error('Error fetching monthly data:', error);
+    } catch (err: any) {
+      console.error('Unexpected error fetching monthly data:', err?.message ?? err, err);
     } finally {
       setLoading(false);
     }

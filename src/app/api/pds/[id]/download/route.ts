@@ -7,6 +7,8 @@ import { transformPDSFromDatabase } from '@/lib/utils/dataTransformers';
 import fs from 'fs';
 import path from 'path';
 
+export const runtime = 'nodejs';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -76,11 +78,17 @@ export async function GET(
     // Handle Excel export - GENERATE FILLED EXCEL FILE
     if (format === 'excel') {
       try {
-        console.log('📊 Generating filled Excel PDS for:', transformedPDSData.personalInfo?.firstName, transformedPDSData.personalInfo?.surname);
-        
-        // Generate the filled Excel file
-        const excelBuffer = await generatePDSExcel(transformedPDSData);
-        
+        console.log(
+          '📊 Generating filled Excel PDS for:',
+          transformedPDSData.personalInfo?.firstName,
+          transformedPDSData.personalInfo?.surname
+        );
+
+        // 🔹 Pass useCurrentDate into the Excel generator
+        const excelBuffer = await generatePDSExcel(transformedPDSData, {
+          useCurrentDate,
+        });
+
         // Generate filename
         const fileName = generatePDSFilename(transformedPDSData.personalInfo);
 
@@ -95,7 +103,8 @@ export async function GET(
         // Return filled Excel file as downloadable
         return new NextResponse(arrayBuffer, {
           headers: {
-            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Type':
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             'Content-Disposition': `attachment; filename="${fileName}"`,
             'Content-Length': excelBuffer.length.toString(),
           },
@@ -103,16 +112,32 @@ export async function GET(
       } catch (error) {
         console.error('❌ Error generating Excel PDS:', error);
         return NextResponse.json(
-          { success: false, error: `Failed to generate Excel PDS: ${error instanceof Error ? error.message : String(error)}` },
+          {
+            success: false,
+            error: `Failed to generate Excel PDS: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          },
           { status: 500 }
         );
       }
     }
 
     // Generate PDF using appropriate generator based on format
-    const doc = format === 'csc'
-      ? await generateCSCFormatPDF(transformedPDSData, includeSignature, true, useCurrentDate)
-      : await generatePDSPDF(transformedPDSData, includeSignature, true, useCurrentDate);
+    const doc =
+      format === 'csc'
+        ? await generateCSCFormatPDF(
+            transformedPDSData,
+            includeSignature,
+            true,
+            useCurrentDate
+          )
+        : await generatePDSPDF(
+            transformedPDSData,
+            includeSignature,
+            true,
+            useCurrentDate
+          );
 
     if (!doc) {
       return NextResponse.json(
@@ -124,8 +149,12 @@ export async function GET(
     const pdfBuffer = doc.output('arraybuffer');
 
     // Create filename with format indicator
-    const surname = pdsData.personal_info?.surname || applicantName.split(' ')[0] || 'Unknown';
-    const firstName = pdsData.personal_info?.firstName || applicantName.split(' ').slice(1).join('_') || 'User';
+    const surname =
+      pdsData.personal_info?.surname || applicantName.split(' ')[0] || 'Unknown';
+    const firstName =
+      pdsData.personal_info?.firstName ||
+      applicantName.split(' ').slice(1).join('_') ||
+      'User';
     const formatLabel = format === 'csc' ? 'CSC' : 'Modern';
     const fileName = `PDS_${formatLabel}_${surname}_${firstName}_${new Date().getTime()}.pdf`;
 

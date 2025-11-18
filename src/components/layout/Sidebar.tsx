@@ -3,6 +3,7 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LucideIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import Image from 'next/image';
 
 interface MenuItem {
   label: string;
@@ -29,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ menuItems, role, isCollapsed, 
       {/* Logo Section */}
       <div className="p-6 flex items-center gap-3 border-b border-white/10">
         <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md">
-          <span className="text-[#1A7F3E] font-bold text-lg">JS</span>
+          <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
         </div>
         {!isCollapsed && (
           <div>

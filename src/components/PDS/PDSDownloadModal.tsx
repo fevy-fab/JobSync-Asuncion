@@ -111,12 +111,12 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
                   }`} />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">Official CSC Format</h4>
+                  <h4 className="font-semibold text-gray-900">Boxed-based PDS Form (PDF)</h4>
                   <p className="text-xs text-gray-600 mt-1">
-                    CS Form 212, Revised 2025
+                    JobSync Layout
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Box-based layout matching official CSC template
+                    Structured box-based design
                   </p>
                 </div>
                 {selectedFormat === 'csc' && (
@@ -145,12 +145,12 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
                   }`} />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">Modern PDF</h4>
+                  <h4 className="font-semibold text-gray-900">Modern PDS Form (PDF)</h4>
                   <p className="text-xs text-gray-600 mt-1">
                     JobSync Layout
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Clean table design
+                    Simple and clean table design
                   </p>
                 </div>
                 {selectedFormat === 'modern' && (
@@ -179,12 +179,12 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
                   }`} />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">Official Excel 2025</h4>
+                  <h4 className="font-semibold text-gray-900">Official CS PDS Form (Excel)</h4>
                   <p className="text-xs text-gray-600 mt-1">
-                    CS Form 212 Excel
+                    Official Government Format
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Editable CSC format
+                    CSC Form No. 212, Revised 2025
                   </p>
                 </div>
                 {selectedFormat === 'excel' && (
@@ -197,12 +197,12 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
           </div>
         </div>
 
-        {/* Options (only for PDF formats) */}
-        {selectedFormat !== 'excel' && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Download Options:</h3>
-            <div className="space-y-2">
-              {/* Include Signature */}
+        {/* Download Options */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Download Options:</h3>
+          <div className="space-y-2">
+            {/* Include Signature – PDF only */}
+            {selectedFormat !== 'excel' && (
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -212,37 +212,39 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
                 />
                 <span className="text-sm text-gray-700">Include Digital Signature</span>
               </label>
+            )}
 
-              {/* Use Current Date */}
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useCurrentDate}
-                  onChange={(e) => setUseCurrentDate(e.target.checked)}
-                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                />
-                <span className="text-sm text-gray-700">Use Current Date (instead of PDS date)</span>
-              </label>
-            </div>
+            {/* Use Current Date – works for all formats, including Excel */}
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useCurrentDate}
+                onChange={(e) => setUseCurrentDate(e.target.checked)}
+                className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+              />
+              <span className="text-sm text-gray-700">
+                Use Current Date (instead of saved PDS date)
+              </span>
+            </label>
           </div>
-        )}
+        </div>
 
         {/* Format Description */}
         <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
           <h4 className="text-sm font-semibold text-gray-900 mb-2">
-            {selectedFormat === 'csc' ? 'Official CSC PDF Format' : selectedFormat === 'excel' ? 'Official Excel 2025 Format' : 'Modern PDF Format'}
+            {selectedFormat === 'csc' ? 'Boxed-based PDS Form' : selectedFormat === 'excel' ? 'Official Excel 2025 Format' : 'Modern PDS Format'}
           </h4>
           <p className="text-xs text-gray-600">
             {selectedFormat === 'csc'
-              ? 'This format replicates the official CS Form No. 212, Revised 2025 with box-based layout. Recommended for submission to government panels and HR offices requiring CSC compliance.'
+              ? 'Box-based layout format with structured sections. Provides a traditional form-style presentation with clearly defined boxes and fields. Ideal for formal submissions and traditional document formats.'
               : selectedFormat === 'excel'
-              ? 'Downloads the official CS Form No. 212, Revised 2025 as an EMPTY editable Excel template (.xlsx). Fill it out manually in Excel/LibreOffice with complete control over formatting. Guaranteed 100% CSC format compliance. Filename: CS_Form_212_LASTNAME_FIRSTNAME_2025.xlsx'
-              : 'This format uses a modern, clean table-based design optimized for readability. Ideal for internal reviews, portfolio purposes, and digital archiving.'}
+              ? 'Official government format (CS Form No. 212, Revised 2025). Recommended for submission to government panels and HR offices requiring CSC compliance.'
+              : 'Streamlined table-based design optimized for readability. Clean layout ideal for internal reviews, portfolio purposes, and digital archiving.'}
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-3 pt-4">
+        <div className="flex gap-3 pt-2">
           <button
             onClick={handleDownload}
             disabled={isDownloading}

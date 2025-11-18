@@ -342,8 +342,8 @@ export default function Home() {
               <h3 className="text-xl font-bold mb-3">Contact</h3>
               <p className="text-white/90 text-sm leading-relaxed">
                 HR Department<br />
-                Phone: (084) XXX-XXXX<br />
-                Email: hr@asuncion.gov.ph
+                Phone: 0912 479 6447<br />
+                Email: hrmolguasuncion@gmail.com
               </p>
             </div>
 

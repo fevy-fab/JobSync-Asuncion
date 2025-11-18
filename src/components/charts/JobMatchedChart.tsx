@@ -30,7 +30,6 @@ export const JobMatchedChart: React.FC = () => {
 
   const fetchJobData = async () => {
     try {
-      // Fetch all applications with job information
       const { data: applications, error } = await supabase
         .from('applications')
         .select(`
@@ -40,9 +39,17 @@ export const JobMatchedChart: React.FC = () => {
           )
         `);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error fetching job data:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        });
+        setData([]);
+        return;
+      }
 
-      // Count applications per job
       const jobCounts: Record<string, { title: string; count: number }> = {};
 
       applications?.forEach((app: any) => {
@@ -53,7 +60,6 @@ export const JobMatchedChart: React.FC = () => {
         jobCounts[jobTitle].count++;
       });
 
-      // Convert to array, sort by count descending, take top 8
       const jobData = Object.values(jobCounts)
         .map(({ title, count }) => ({
           jobTitle: title.length > 30 ? title.substring(0, 30) + '...' : title,
@@ -63,8 +69,8 @@ export const JobMatchedChart: React.FC = () => {
         .slice(0, 8);
 
       setData(jobData);
-    } catch (error) {
-      console.error('Error fetching job data:', error);
+    } catch (err: any) {
+      console.error('Unexpected error fetching job data:', err?.message ?? err, err);
     } finally {
       setLoading(false);
     }
