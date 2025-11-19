@@ -11,6 +11,8 @@
  * - Boolean Matching: Gale-Shapley Algorithm for stable matching
  */
 
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
 export interface JobRequirements {
   title?: string; // Job title for relevance matching
   description?: string; // Job description for context
@@ -100,6 +102,41 @@ function stringSimilarity(str1: string, str2: string): number {
   const similarity = ((maxLen - distance) / maxLen) * 100;
 
   return Math.max(0, Math.min(100, similarity));
+}
+
+/**
+ * Map raw similarity (0–100) to a stricter eligibility score (0–100).
+ * This keeps Levenshtein / token similarity, but interprets it more aggressively
+ * so that near-matches don't get almost-perfect scores.
+ *
+ * Example:
+ * - 99–100 → 100 (exact/almost exact)
+ * - 95–<99 → 70
+ * - 90–<95 → 50
+ * - 80–<90 → 30
+ * - <80    → 0
+ */
+function mapEligibilitySimilarity(similarity: number): number {
+  const s = Math.max(0, Math.min(100, similarity));
+
+  if (s >= 99) {
+    // Essentially exact text match.
+    return 100;
+  }
+  if (s >= 95) {
+    // Very close wording but not identical → heavy penalty vs 100.
+    return 70;
+  }
+  if (s >= 90) {
+    // Similar but with meaningful difference.
+    return 50;
+  }
+  if (s >= 80) {
+    // Related, but not reliably meeting requirement.
+    return 30;
+  }
+  // Below 80 → treat as not meeting the eligibility for scoring purposes.
+  return 0;
 }
 
 /**
@@ -384,8 +421,17 @@ export function algorithm1_WeightedSum(
   }
 
   // Job title relevance component (30% weight)
-  let relevanceScore = 50; // Default neutral score
-  if (job.title && applicant.workExperienceTitles && applicant.workExperienceTitles.length > 0) {
+  let relevanceScore: number;
+
+  // New rule:
+  // - If no experience at all → relevanceScore = 0 (titles don't matter)
+  // - If has experience but no titles → relevanceScore = 50 (neutral)
+  // - If has experience and titles → compute similarity as before
+  if (applicantYears === 0) {
+    relevanceScore = 0;
+  } else if (!applicant.workExperienceTitles || applicant.workExperienceTitles.length === 0) {
+    relevanceScore = 50; // neutral when we don't know titles
+  } else if (job.title) {
     const jobTitleLower = job.title.toLowerCase().trim();
     let bestTitleMatch = 0;
 
@@ -405,6 +451,9 @@ export function algorithm1_WeightedSum(
     }
 
     relevanceScore = bestTitleMatch;
+  } else {
+    // Job has no title, we can't compute relevance
+    relevanceScore = 50;
   }
 
   // Combined experience score: 70% years + 30% relevance
@@ -415,91 +464,44 @@ export function algorithm1_WeightedSum(
   const skillsScore = skillsMatch.score;
   const matchedSkillsCount = skillsMatch.matchedCount;
 
-  // Eligibility Score: Proportional matching with fuzzy similarity
+  // Eligibility Score: STRICT 0 or 100 based on exact matches
   const jobEligibilities = job.eligibilities.map(e => e.toLowerCase().trim());
   const applicantEligibilities = applicant.eligibilities
     .filter(e => e && e.eligibilityTitle)
     .map(e => e.eligibilityTitle.toLowerCase().trim());
 
-  let eligibilityScore = 50; // Default for no requirements
+  let eligibilityScore = 50; // Neutral if no eligibility is required
   let matchedEligibilitiesCount = 0;
 
-  if (jobEligibilities.length > 0 && !jobEligibilities.some(e => e.includes('none') || e.includes('not required'))) {
-    let totalScore = 0;
-    const matchedEligibilities = new Set<string>(); // ✅ Track unique applicant eligibilities
+  if (jobEligibilities.length > 0 && !jobEligibilities.some(e =>
+    e.includes('none') || e.includes('not required')
+  )) {
+    // Count exact (case-insensitive) matches
+    const applicantSet = new Set(applicantEligibilities);
 
     for (const reqElig of jobEligibilities) {
-      let bestMatch = 0;
-      let bestMatchingAppElig = ''; // ✅ Track WHICH applicant eligibility matched
-
-      for (const appElig of applicantEligibilities) {
-        const similarity = stringSimilarity(reqElig, appElig);
-
-        if (similarity >= 70) {
-          // Strong match (exact or very similar)
-          if (similarity > bestMatch) {
-            bestMatch = similarity;
-            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
-          }
-        } else if (similarity >= 40) {
-          // Moderate match
-          const moderateScore = similarity * 0.7;
-          if (moderateScore > bestMatch) {
-            bestMatch = moderateScore;
-            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
-          }
-        } else {
-          // Check for keyword matches (e.g., "Civil Service" in both)
-          const reqTokens = normalizeSkill(reqElig);
-          const appTokens = normalizeSkill(appElig);
-          const commonTokens = reqTokens.filter(token => appTokens.includes(token));
-
-          if (commonTokens.length > 0) {
-            const tokenMatchScore = (commonTokens.length / reqTokens.length) * 40;
-            if (tokenMatchScore > bestMatch) {
-              bestMatch = tokenMatchScore;
-              bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
-            }
-          }
-        }
+      if (applicantSet.has(reqElig)) {
+        matchedEligibilitiesCount++;
       }
-
-      if (bestMatchingAppElig) {
-        matchedEligibilities.add(bestMatchingAppElig); // ✅ Add unique applicant eligibility to Set
-      }
-      totalScore += bestMatch;
     }
 
-    matchedEligibilitiesCount = matchedEligibilities.size; // ✅ Count unique applicant eligibilities
+    // STRICT RULE:
+    // - If applicant has ALL required eligibilities → 100
+    // - Otherwise → 0
+    if (matchedEligibilitiesCount === jobEligibilities.length && matchedEligibilitiesCount > 0) {
+      eligibilityScore = 100;
+    } else {
+      eligibilityScore = 0;
+    }
 
-    // Debug logging for eligibility matching
-    console.log(`🔍 [Algorithm 1] Eligibility matching:`, {
+    console.log('🔍 [Algorithm 1] Eligibility exact matching:', {
       jobEligibilities,
       applicantEligibilities,
-      matchedEligibilities: Array.from(matchedEligibilities),
-      matchedCount: matchedEligibilitiesCount,
-      totalScore
+      matchedEligibilitiesCount,
+      eligibilityScore,
     });
-
-    // Calculate proportional score
-    const matchRatio = matchedEligibilitiesCount / jobEligibilities.length;
-    const avgSimilarity = totalScore / jobEligibilities.length;
-
-    // Combined score: 60% match ratio + 40% similarity quality
-    eligibilityScore = (matchRatio * 60) + (avgSimilarity * 0.4);
-
-    // Bonus for having more eligibilities than required
-    const bonusElig = Math.max(0, applicantEligibilities.length - jobEligibilities.length);
-    const bonus = Math.min(bonusElig * 5, 15); // Max 15% bonus
-    eligibilityScore = Math.min(eligibilityScore + bonus, 100);
-
-    // Ensure minimum score if some matches found
-    if (matchedEligibilitiesCount > 0) {
-      eligibilityScore = Math.max(eligibilityScore, 40);
-    } else {
-      eligibilityScore = Math.min(eligibilityScore, 25); // Penalty for no matches
-    }
   }
+
 
   // Weighted sum calculation
   const weights = { education: 0.30, experience: 0.20, skills: 0.20, eligibility: 0.30 };
@@ -566,9 +568,14 @@ export function algorithm2_SkillExperienceComposite(
     yearsScore = 33.3;
   }
 
-  // Job title relevance component
-  let relevanceScore = 50;
-  if (job.title && applicant.workExperienceTitles && applicant.workExperienceTitles.length > 0) {
+  // New Job title relevance component
+  let relevanceScore: number;
+
+  if (applicantYears === 0) {
+    relevanceScore = 0;
+  } else if (!applicant.workExperienceTitles || applicant.workExperienceTitles.length === 0) {
+    relevanceScore = 50;
+  } else if (job.title) {
     const jobTitleLower = job.title.toLowerCase().trim();
     let bestTitleMatch = 0;
 
@@ -587,6 +594,8 @@ export function algorithm2_SkillExperienceComposite(
     }
 
     relevanceScore = bestTitleMatch;
+  } else {
+    relevanceScore = 50;
   }
 
   const experienceScore = (yearsScore * 0.7) + (relevanceScore * 0.3);
@@ -628,7 +637,7 @@ export function algorithm2_SkillExperienceComposite(
 
   educationScore = Math.max(educationScore, 30);
 
-  // Eligibility scoring: Enhanced proportional matching
+  // Eligibility scoring: STRICT 0 or 100 based on exact matches
   const jobEligibilities = job.eligibilities.map(e => e.toLowerCase().trim());
   const applicantEligibilities = applicant.eligibilities
     .filter(e => e && e.eligibilityTitle)
@@ -637,65 +646,29 @@ export function algorithm2_SkillExperienceComposite(
   let eligibilityScore = 50;
   let matchedEligibilitiesCount = 0;
 
-  if (jobEligibilities.length > 0 && !jobEligibilities.some(e => e.includes('none') || e.includes('not required'))) {
-    let totalScore = 0;
-    const matchedEligibilities = new Set<string>(); // ✅ Track unique applicant eligibilities
+  if (jobEligibilities.length > 0 && !jobEligibilities.some(e =>
+    e.includes('none') || e.includes('not required')
+  )) {
+    const applicantSet = new Set(applicantEligibilities);
 
     for (const reqElig of jobEligibilities) {
-      let bestMatch = 0;
-      let bestMatchingAppElig = ''; // ✅ Track WHICH applicant eligibility matched
-
-      for (const appElig of applicantEligibilities) {
-        const similarity = stringSimilarity(reqElig, appElig);
-
-        if (similarity >= 70) {
-          if (similarity > bestMatch) {
-            bestMatch = similarity;
-            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
-          }
-        } else if (similarity >= 40) {
-          const moderateScore = similarity * 0.7;
-          if (moderateScore > bestMatch) {
-            bestMatch = moderateScore;
-            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
-          }
-        } else {
-          const reqTokens = normalizeSkill(reqElig);
-          const appTokens = normalizeSkill(appElig);
-          const commonTokens = reqTokens.filter(token => appTokens.includes(token));
-
-          if (commonTokens.length > 0) {
-            const tokenMatchScore = (commonTokens.length / reqTokens.length) * 40;
-            if (tokenMatchScore > bestMatch) {
-              bestMatch = tokenMatchScore;
-              bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
-            }
-          }
-        }
+      if (applicantSet.has(reqElig)) {
+        matchedEligibilitiesCount++;
       }
-
-      if (bestMatchingAppElig) {
-        matchedEligibilities.add(bestMatchingAppElig); // ✅ Add unique applicant eligibility to Set
-      }
-      totalScore += bestMatch;
     }
 
-    matchedEligibilitiesCount = matchedEligibilities.size; // ✅ Count unique applicant eligibilities
-
-    const matchRatio = matchedEligibilitiesCount / jobEligibilities.length;
-    const avgSimilarity = totalScore / jobEligibilities.length;
-
-    eligibilityScore = (matchRatio * 60) + (avgSimilarity * 0.4);
-
-    const bonusElig = Math.max(0, applicantEligibilities.length - jobEligibilities.length);
-    const bonus = Math.min(bonusElig * 5, 15);
-    eligibilityScore = Math.min(eligibilityScore + bonus, 100);
-
-    if (matchedEligibilitiesCount > 0) {
-      eligibilityScore = Math.max(eligibilityScore, 40);
+    if (matchedEligibilitiesCount === jobEligibilities.length && matchedEligibilitiesCount > 0) {
+      eligibilityScore = 100;
     } else {
-      eligibilityScore = Math.min(eligibilityScore, 25);
+      eligibilityScore = 0;
     }
+
+    console.log('🔍 [Algorithm 2] Eligibility exact matching:', {
+      jobEligibilities,
+      applicantEligibilities,
+      matchedEligibilitiesCount,
+      eligibilityScore,
+    });
   }
 
   // Composite calculation
@@ -731,9 +704,9 @@ export function algorithm3_EligibilityEducationTiebreaker(
   applicant: ApplicantData
 ): ScoreBreakdown {
   let totalScore = 0;
-  let reasoning = [];
+  let reasoning: string[] = [];
 
-  // Priority 1: Professional License (highest weight) - Enhanced proportional matching
+  // Priority 1: Professional License (highest weight) - STRICT 0 or 100
   const jobEligibilities = job.eligibilities.map(e => e.toLowerCase().trim());
   const applicantEligibilities = applicant.eligibilities
     .filter(e => e && e.eligibilityTitle)
@@ -742,45 +715,35 @@ export function algorithm3_EligibilityEducationTiebreaker(
   let eligibilityScore = 0;
   let matchedEligibilitiesCount = 0;
 
-  if (jobEligibilities.length > 0 && !jobEligibilities.some(e => e.includes('none') || e.includes('not required'))) {
-    let totalEligScore = 0;
-    const matchedEligibilities = new Set<string>(); // ✅ Track unique applicant eligibilities
+  if (jobEligibilities.length > 0 && !jobEligibilities.some(e =>
+    e.includes('none') || e.includes('not required')
+  )) {
+    const applicantSet = new Set(applicantEligibilities);
 
     for (const reqElig of jobEligibilities) {
-      let bestMatch = 0;
-      let bestMatchingAppElig = ''; // ✅ Track WHICH applicant eligibility matched
-
-      for (const appElig of applicantEligibilities) {
-        const similarity = stringSimilarity(reqElig, appElig);
-        if (similarity >= 70) {
-          if (similarity > bestMatch) {
-            bestMatch = similarity;
-            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
-          }
-        } else if (similarity >= 40) {
-          const moderateScore = similarity * 0.7;
-          if (moderateScore > bestMatch) {
-            bestMatch = moderateScore;
-            bestMatchingAppElig = appElig; // ✅ Store the applicant eligibility
-          }
-        }
+      if (applicantSet.has(reqElig)) {
+        matchedEligibilitiesCount++;
       }
-
-      if (bestMatchingAppElig) {
-        matchedEligibilities.add(bestMatchingAppElig); // ✅ Add unique applicant eligibility to Set
-      }
-      totalEligScore += bestMatch;
     }
 
-    matchedEligibilitiesCount = matchedEligibilities.size; // ✅ Count unique applicant eligibilities
-
-    const matchRatio = matchedEligibilitiesCount / jobEligibilities.length;
-    const avgSimilarity = totalEligScore / jobEligibilities.length;
-    eligibilityScore = (matchRatio * 60) + (avgSimilarity * 0.4);
+    if (matchedEligibilitiesCount === jobEligibilities.length && matchedEligibilitiesCount > 0) {
+      eligibilityScore = 100;
+    } else {
+      eligibilityScore = 0;
+    }
 
     const scoreContribution = (eligibilityScore / 100) * 40;
     totalScore += scoreContribution;
-    reasoning.push(`Professional license match: ${eligibilityScore.toFixed(1)}% (+${scoreContribution.toFixed(1)})`);
+    reasoning.push(
+      `Professional license match: ${eligibilityScore.toFixed(1)}% (+${scoreContribution.toFixed(1)})`
+    );
+
+    console.log('🔍 [Algorithm 3] Eligibility exact matching:', {
+      jobEligibilities,
+      applicantEligibilities,
+      matchedEligibilitiesCount,
+      eligibilityScore,
+    });
   } else {
     eligibilityScore = 50;
     totalScore += 20; // Neutral score
@@ -839,9 +802,14 @@ export function algorithm3_EligibilityEducationTiebreaker(
     yearsScore = 33.3;
   }
 
-  // Job title relevance
-  let relevanceScore = 50;
-  if (job.title && applicant.workExperienceTitles && applicant.workExperienceTitles.length > 0) {
+  // New Job title relevance
+  let relevanceScore: number;
+
+  if (applicantYears === 0) {
+    relevanceScore = 0;
+  } else if (!applicant.workExperienceTitles || applicant.workExperienceTitles.length === 0) {
+    relevanceScore = 50;
+  } else if (job.title) {
     const jobTitleLower = job.title.toLowerCase().trim();
     let bestTitleMatch = 0;
 
@@ -851,6 +819,8 @@ export function algorithm3_EligibilityEducationTiebreaker(
     }
 
     relevanceScore = bestTitleMatch;
+  } else {
+    relevanceScore = 50;
   }
 
   const experienceScore = (yearsScore * 0.7) + (relevanceScore * 0.3);

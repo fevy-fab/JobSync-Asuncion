@@ -678,7 +678,7 @@ export default function RankedRecordsPage() {
 
       if (result.success) {
         showToast(
-          `✨ Successfully ranked ${result.totalApplicants} applicant${result.totalApplicants !== 1 ? 's' : ''} for ${result.jobTitle}! Rankings are now visible below.`,
+          `Successfully ranked ${result.totalApplicants} applicant${result.totalApplicants !== 1 ? 's' : ''} for ${result.jobTitle}! Rankings are now visible below.`,
           'success'
         );
 
@@ -795,13 +795,52 @@ export default function RankedRecordsPage() {
       totalApplicants: jobApplicants.length,
     };
 
-    // Extract job requirements from the raw data
-    const jobRequirements = raw?.jobs ? {
-      degreeRequirement: raw.jobs.degree_requirement || 'Not specified',
-      eligibilities: raw.jobs.eligibilities || [],
-      skills: raw.jobs.skills || [],
-      yearsOfExperience: raw.jobs.years_of_experience || 0,
-    } : null;
+    // Extract job requirements from the raw data (using freshest job fields)
+    const jobRequirements = (() => {
+      if (!raw?.jobs) return null;
+
+      const job = raw.jobs;
+
+      // Handle multiple possible shapes for eligibilities
+      let eligibilities: string[] = [];
+
+      if (Array.isArray(job.eligibilities)) {
+        eligibilities = job.eligibilities;
+      } else if (typeof job.eligibilities === 'string' && job.eligibilities.trim().length > 0) {
+        // If backend stores as comma-separated string
+        eligibilities = job.eligibilities
+          .split(',')
+          .map((e: string) => e.trim())
+          .filter(Boolean);
+      } else if (Array.isArray(job.required_eligibilities)) {
+        // Alternative field name, if you use this in jobs table
+        eligibilities = job.required_eligibilities;
+      }
+
+      // Same idea for skills – handle array OR comma string
+      let skills: string[] = [];
+      if (Array.isArray(job.skills)) {
+        skills = job.skills;
+      } else if (typeof job.skills === 'string' && job.skills.trim().length > 0) {
+        skills = job.skills
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+      }
+
+      return {
+        degreeRequirement:
+          job.degree_requirement ||
+          job.degreeRequirement ||
+          'Not specified',
+        eligibilities,
+        skills,
+        yearsOfExperience:
+          job.years_of_experience ??
+          job.yearsOfExperience ??
+          0,
+      };
+    })();
 
     console.log('✅ Setting applicant data with statistics:', applicantData);
     console.log('✅ Setting job requirements:', jobRequirements);

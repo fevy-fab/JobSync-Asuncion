@@ -22,6 +22,7 @@ import {
   getRelativePositionMessage,
 } from '@/lib/utils/rankingStatistics';
 import { AlgorithmInfoModal } from './AlgorithmInfoModal';
+import { getSkillMatchPairs } from '@/lib/utils/textMatching';
 
 /**
  * Calculate string similarity percentage using Levenshtein distance
@@ -186,6 +187,16 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
   const [isAlgorithmInfoOpen, setIsAlgorithmInfoOpen] = useState(false);
 
   if (!applicant) return null;
+
+  // For "How This Applicant Matches → Skills Match"
+  const skillMatchPairs =
+    jobRequirements &&
+    jobRequirements.skills &&
+    jobRequirements.skills.length > 0 &&
+    applicant.skills &&
+    applicant.skills.length > 0
+      ? getSkillMatchPairs(jobRequirements.skills, applicant.skills)
+      : [];
 
   // Generate plain English explanation of ranking
   const generateRankingExplanation = (): string => {
@@ -641,21 +652,43 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                 <p className="text-sm text-gray-600 mt-2">
                   <span className="font-semibold">
                     {(() => {
-                      // Use stored match count from database (calculated with fuzzy matching)
                       const matchedSkillsCount = applicant.matchedSkillsCount ?? 0;
-                      const matchPercentage = Math.round((matchedSkillsCount / jobRequirements.skills.length) * 100);
+                      const totalRequired = jobRequirements.skills.length;
 
+                      // 1) No direct matches, but score > 0 = fuzzy/related only
                       if (matchedSkillsCount === 0) {
-                        // Check if there's a non-zero score despite 0 exact matches (indicates partial/token matching)
                         if (applicant.skillsScore > 0) {
-                          return <span className="text-orange-600">(Partial alignment detected - related skills found) 🔸</span>;
+                          return (
+                            <span className="text-orange-600">
+                              No required skills are directly matched yet, but several related skills
+                              contribute to the overall {applicant.skillsScore.toFixed(1)}% skills score. 🔸
+                            </span>
+                          );
                         }
-                        return <span className="text-red-600">(0 out of {jobRequirements.skills.length} required skills) ⚠</span>;
-                      } else if (matchedSkillsCount === jobRequirements.skills.length) {
-                        return <span className="text-green-600">(All {jobRequirements.skills.length} required skills matched) ⭐</span>;
-                      } else {
-                        return <span className="text-yellow-600">({matchedSkillsCount} out of {jobRequirements.skills.length} required skills - {matchPercentage}%) ⚡</span>;
+                        return (
+                          <span className="text-red-600">
+                            No required skills matched ({totalRequired} required). ⚠
+                          </span>
+                        );
                       }
+
+                      // 2) All required skills matched
+                      if (matchedSkillsCount === totalRequired) {
+                        return (
+                          <span className="text-green-600">
+                            All {totalRequired} required skills are matched directly. ⭐
+                          </span>
+                        );
+                      }
+
+                      // 3) Some direct matches, others from fuzzy/related skills
+                      return (
+                        <span className="text-yellow-600">
+                          Matches {matchedSkillsCount} of {totalRequired} required skills.
+                          The skills score ({applicant.skillsScore.toFixed(1)}%) comes from
+                          related or partially matching skills. ⚡
+                        </span>
+                      );
                     })()}
                   </span>
                 </p>
@@ -833,26 +866,61 @@ export function RankingDetailsModal({ isOpen, onClose, applicant, jobRequirement
                     <Wrench className="w-5 h-5 text-purple-600 mt-0.5" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-700 mb-2">Skills Match</p>
-                      <div className="space-y-2">
-                        {jobRequirements.skills.map((reqSkill, idx) => {
-                          const hasSkill = applicant.skills?.some(
-                            s => s.toLowerCase().includes(reqSkill.toLowerCase()) ||
-                                 reqSkill.toLowerCase().includes(s.toLowerCase())
-                          );
-                          return (
+
+                      {skillMatchPairs.length > 0 ? (
+                        <>
+                          <p className="text-xs text-gray-500 mb-1">
+                            Each required skill is mapped to the closest skill from this applicant:
+                          </p>
+                          <div className="space-y-2">
+                            {skillMatchPairs.map((pair, idx) => {
+                              const hasSkill = pair.matchType !== 'none';
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className="flex flex-wrap items-baseline gap-2 text-sm"
+                                >
+                                  {hasSkill ? (
+                                    <CheckCircle className="w-4 h-4 text-green-500" />
+                                  ) : (
+                                    <XCircle className="w-4 h-4 text-red-400" />
+                                  )}
+
+                                  <span className={hasSkill ? 'text-gray-900' : 'text-gray-500'}>
+                                    {pair.jobSkill}
+                                  </span>
+
+                                  {/* Only show arrow + applicant skill if there IS a related skill */}
+                                  {hasSkill && (
+                                    <>
+                                      <span className="text-gray-400">→</span>
+                                      <span className="text-gray-900">
+                                        {pair.applicantSkill}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                          </div>
+                        </>
+                      ) : (
+                        <div className="space-y-2">
+                          {jobRequirements.skills.map((reqSkill, idx) => (
                             <div key={idx} className="flex items-center gap-2 text-sm">
-                              {hasSkill ? (
-                                <CheckCircle className="w-4 h-4 text-green-500" />
-                              ) : (
-                                <XCircle className="w-4 h-4 text-red-400" />
-                              )}
-                              <span className={hasSkill ? 'text-gray-900' : 'text-gray-500'}>
-                                {reqSkill}
-                              </span>
+                              <XCircle className="w-4 h-4 text-red-400" />
+                              <span className="text-gray-500">{reqSkill}</span>
                             </div>
-                          );
-                        })}
-                      </div>
+                          ))}
+                          {(!applicant.skills || applicant.skills.length === 0) && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              Applicant has no listed skills yet, so no mappings can be shown.
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
