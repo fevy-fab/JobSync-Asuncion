@@ -62,23 +62,83 @@ function extractPDSData(pds: any, profile: any) {
 
   // Extract highest educational attainment from PDS educational_background
   let education = profile?.highest_educational_attainment || 'Not specified';
+
   if (pds?.educational_background && Array.isArray(pds.educational_background)) {
-    const levels: Record<string, number> = {
-      'GRADUATE STUDIES': 5,
-      'COLLEGE': 4,
-      'VOCATIONAL': 3,
-      'SECONDARY': 2,
-      'ELEMENTARY': 1
+    // Normalize and bucket entries by level
+    const byLevel = {
+      GRADUATE_STUDIES: [] as any[],
+      COLLEGE: [] as any[],
+      VOCATIONAL: [] as any[],
+      SECONDARY: [] as any[],
+      ELEMENTARY: [] as any[],
     };
 
-    const highest = pds.educational_background.reduce((max: any, current: any) => {
-      const currentLevel = levels[current.level?.toUpperCase()] || 0;
-      const maxLevel = max ? (levels[max.level?.toUpperCase()] || 0) : 0;
-      return currentLevel > maxLevel ? current : max;
-    }, null);
+    for (const entry of pds.educational_background) {
+      const levelKey = String(entry.level || '').toUpperCase().trim();
 
-    if (highest) {
-      education = highest.basicEducationDegreeCourse || highest.course || highest.level;
+      if (levelKey.includes('GRADUATE')) {
+        byLevel.GRADUATE_STUDIES.push(entry);
+      } else if (levelKey.includes('COLLEGE')) {
+        byLevel.COLLEGE.push(entry);
+      } else if (levelKey.includes('VOCATIONAL')) {
+        byLevel.VOCATIONAL.push(entry);
+      } else if (levelKey.includes('SECONDARY') || levelKey.includes('HIGH SCHOOL')) {
+        byLevel.SECONDARY.push(entry);
+      } else if (levelKey.includes('ELEMENTARY')) {
+        byLevel.ELEMENTARY.push(entry);
+      }
+    }
+
+    // Helper to turn entries into nice degree strings
+    const entriesToDegreeNames = (entries: any[]): string[] =>
+      entries
+        .map((e: any) =>
+          e.basicEducationDegreeCourse ||
+          e.course ||
+          e.degree ||
+          e.nameOfSchool ||
+          e.level
+        )
+        .map((s: any) => String(s).trim())
+        .filter((s: string) => s.length > 0);
+
+        // Collect degrees to include based on your rules
+        const degreesToInclude: string[] = [];
+
+        if (byLevel.GRADUATE_STUDIES.length > 0) {
+          // If there is 1 or more graduate studies degrees, take it as highestEducationalAttainment
+          degreesToInclude.push(...entriesToDegreeNames(byLevel.GRADUATE_STUDIES));
+
+          // If there is 1 or more both college and graduate studies degrees, take both levels
+          if (byLevel.COLLEGE.length > 0) {
+            degreesToInclude.push(...entriesToDegreeNames(byLevel.COLLEGE));
+          }
+        } else if (byLevel.COLLEGE.length > 0) {
+          // If there is 1 or more college degrees, take it as highestEducationalAttainment
+          degreesToInclude.push(...entriesToDegreeNames(byLevel.COLLEGE));
+
+          // If there is 1 or more both college and vocational degrees, take both levels
+          if (byLevel.VOCATIONAL.length > 0) {
+            degreesToInclude.push(...entriesToDegreeNames(byLevel.VOCATIONAL));
+          }
+        } else if (byLevel.VOCATIONAL.length > 0) {
+          // If there is 1 or more vocational degrees, take it as highestEducationalAttainment
+          degreesToInclude.push(...entriesToDegreeNames(byLevel.VOCATIONAL));
+        } else if (byLevel.SECONDARY.length > 0) {
+          // No college/vocational/grad, fall back to secondary if present
+          degreesToInclude.push(...entriesToDegreeNames(byLevel.SECONDARY));
+        } else if (byLevel.ELEMENTARY.length > 0) {
+          // Last fallback: elementary
+          degreesToInclude.push(...entriesToDegreeNames(byLevel.ELEMENTARY));
+        }
+
+    // Format nicely: "A", "A and B", "A, B, and C"
+    if (degreesToInclude.length === 1) {
+      education = degreesToInclude[0];
+    } else if (degreesToInclude.length === 2) {
+      education = `${degreesToInclude[0]} and ${degreesToInclude[1]}`;
+    } else if (degreesToInclude.length > 2) {
+      education = `${degreesToInclude.slice(0, -1).join(', ')}, and ${degreesToInclude[degreesToInclude.length - 1]}`;
     }
   }
 

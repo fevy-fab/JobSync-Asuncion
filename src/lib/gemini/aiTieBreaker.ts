@@ -173,7 +173,7 @@ function parseAIResponse(
         microAdjustment,
         reasoning: ranking.reasoning || 'AI-powered differentiation',
       };
-    }).filter((r): r is TieBreakResult => r !== null);
+    }).filter((r: TieBreakResult | null): r is TieBreakResult => r !== null);
   } catch (error) {
     console.error('Failed to parse AI response:', error);
     console.log('Raw response:', response);

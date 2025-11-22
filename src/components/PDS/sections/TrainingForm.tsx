@@ -71,7 +71,7 @@ export const TrainingForm: React.FC<TrainingFormProps> = ({
         }
         onRemove={remove}
         addButtonLabel="Add Training"
-        maxItems={20}
+        maxItems={21}
         emptyMessage="No training programs added yet. Click 'Add Training' to get started."
         renderItem={(field, index) => (
           <div className="space-y-4">

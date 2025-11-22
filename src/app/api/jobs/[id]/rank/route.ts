@@ -107,21 +107,51 @@ export async function POST(
             'COLLEGE': 4,
             'VOCATIONAL': 3,
             'SECONDARY': 2,
-            'ELEMENTARY': 1
+            'ELEMENTARY': 1,
           };
 
-          const highest = pds.educational_background
-            .filter((edu: any) => edu && edu.level)
-            .reduce((max: any, current: any) => {
-              const currentLevel = levels[current.level.toUpperCase() as keyof typeof levels] || 0;
-              const maxLevel = max ? (levels[max.level.toUpperCase() as keyof typeof levels] || 0) : 0;
-              return currentLevel > maxLevel ? current : max;
-            }, null);
+          // Keep only entries that have a recognizable level
+          const entriesWithLevel = pds.educational_background.filter((edu: any) => {
+            const levelKey = edu?.level?.toUpperCase?.();
+            return levelKey && levels[levelKey] != null;
+          });
 
-          if (highest) {
-            // Extract degree name only (not level prefix) to match algorithm expectations
-            // Use basicEducationDegreeCourse (actual PDS field) with fallbacks
-            highestEducation = highest.basicEducationDegreeCourse || highest.course || highest.level;
+          if (entriesWithLevel.length > 0) {
+            // 1) Find the highest level present (e.g. 5 for graduate, 4 for college)
+            let maxLevel = 0;
+            for (const edu of entriesWithLevel) {
+              const levelKey = edu.level.toUpperCase();
+              const lvl = levels[levelKey as keyof typeof levels] || 0;
+              if (lvl > maxLevel) maxLevel = lvl;
+            }
+
+            // 2) Collect ALL entries at that highest level
+            const topEntries = entriesWithLevel.filter((edu: any) => {
+              const levelKey = edu.level.toUpperCase();
+              return levels[levelKey as keyof typeof levels] === maxLevel;
+            });
+
+            // 3) Build degree names from those entries
+            const degreeNames = topEntries
+              .map((edu: any) =>
+                edu.basicEducationDegreeCourse ||
+                edu.course ||
+                edu.degree ||
+                edu.nameOfSchool ||
+                edu.level
+              )
+              .map((s: any) => String(s).trim())
+              .filter((s: string) => s.length > 0);
+
+            if (degreeNames.length === 1) {
+              highestEducation = degreeNames[0];
+            } else if (degreeNames.length === 2) {
+              // "A and B"
+              highestEducation = `${degreeNames[0]} and ${degreeNames[1]}`;
+            } else if (degreeNames.length > 2) {
+              // "A, B, and C"
+              highestEducation = `${degreeNames.slice(0, -1).join(', ')}, and ${degreeNames[degreeNames.length - 1]}`;
+            }
           }
         }
 

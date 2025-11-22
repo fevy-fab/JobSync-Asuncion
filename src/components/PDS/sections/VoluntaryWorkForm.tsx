@@ -69,7 +69,7 @@ export const VoluntaryWorkForm: React.FC<VoluntaryWorkFormProps> = ({
         }
         onRemove={remove}
         addButtonLabel="Add Voluntary Work"
-        maxItems={15}
+        maxItems={7}
         emptyMessage="No voluntary work added yet. If you have community involvement, click 'Add Voluntary Work' to get started."
         renderItem={(field, index) => (
           <div className="space-y-4">

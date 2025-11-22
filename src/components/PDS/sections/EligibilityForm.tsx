@@ -69,7 +69,7 @@ export const EligibilityForm: React.FC<EligibilityFormProps> = ({
         }
         onRemove={remove}
         addButtonLabel="Add Eligibility"
-        maxItems={15}
+        maxItems={7}
         emptyMessage="No eligibilities added yet. If you have any certifications or licenses, click 'Add Eligibility' to get started."
         renderItem={(field, index) => (
           <div className="space-y-4">
@@ -178,7 +178,7 @@ export const EligibilityForm: React.FC<EligibilityFormProps> = ({
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-700">
-          <strong>Note:</strong> This section is optional, but adding eligibilities and certifications can improve your application ranking.
+          <strong>Note:</strong> Please write all information in full. Do not use abbreviations, initials, or shortened forms. This section is optional, but adding eligibilities and certifications can improve your application ranking.
         </p>
       </div>
     </div>

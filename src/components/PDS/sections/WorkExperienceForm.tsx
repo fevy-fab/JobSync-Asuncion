@@ -71,7 +71,7 @@ export const WorkExperienceForm: React.FC<WorkExperienceFormProps> = ({
         }
         onRemove={remove}
         addButtonLabel="Add Work Experience"
-        maxItems={20}
+        maxItems={28}
         emptyMessage="No work experience added yet. Click 'Add Work Experience' to get started."
         renderItem={(field, index) => (
           <div className="space-y-4">

@@ -2,11 +2,36 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton, DropdownMenu, type DropdownMenuItem } from '@/components/ui';
+import {
+  Card,
+  EnhancedTable,
+  Button,
+  Input,
+  Textarea,
+  Container,
+  Badge,
+  RefreshButton,
+  DropdownMenu,
+  type DropdownMenuItem,
+} from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Edit, EyeOff, Trash2, Briefcase, GraduationCap, CheckCircle2, X, Loader2, AlertCircle, Eye, Archive, Filter } from 'lucide-react';
+import {
+  Plus,
+  Edit,
+  EyeOff,
+  Trash2,
+  Briefcase,
+  GraduationCap,
+  CheckCircle2,
+  X,
+  Loader2,
+  AlertCircle,
+  Eye,
+  Archive,
+  Filter,
+} from 'lucide-react';
 
 interface Job {
   id: string;
@@ -39,7 +64,9 @@ export default function JobManagementPage() {
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [applicationCount, setApplicationCount] = useState<number>(0);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden' | 'archived'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden' | 'archived'>(
+    'all'
+  );
   const [expandedSkillsCards, setExpandedSkillsCards] = useState<Set<string>>(new Set());
 
   const [formData, setFormData] = useState({
@@ -62,19 +89,28 @@ export default function JobManagementPage() {
       const result = await response.json();
 
       if (result.success) {
-        setJobs(result.data.map((job: any) => ({
-          id: job.id,
-          position: job.title,
-          degree: job.degree_requirement,
-          eligibilities: job.eligibilities.join(', '),
-          skills: job.skills.join(', '),
-          experience: job.experience ||
-            (job.min_years_experience && job.max_years_experience
-              ? `${job.min_years_experience}-${job.max_years_experience} years`
-              : 'Not specified'),
-          status: job.status === 'active' ? 'Active' : job.status === 'hidden' ? 'Hidden' : 'Archived',
-          _raw: job
-        })));
+        setJobs(
+          result.data.map((job: any) => ({
+            id: job.id,
+            position: job.title,
+            degree: job.degree_requirement,
+            // For display, join with comma (each array item is one "line requirement")
+            eligibilities: job.eligibilities.join(', '),
+            skills: job.skills.join(', '),
+            experience:
+              job.experience ||
+              (job.min_years_experience && job.max_years_experience
+                ? `${job.min_years_experience}-${job.max_years_experience} years`
+                : 'Not specified'),
+            status:
+              job.status === 'active'
+                ? 'Active'
+                : job.status === 'hidden'
+                ? 'Hidden'
+                : 'Archived',
+            _raw: job,
+          }))
+        );
       } else {
         showToast(getErrorMessage(result.error), 'error');
       }
@@ -90,6 +126,14 @@ export default function JobManagementPage() {
   useEffect(() => {
     fetchJobs();
   }, [fetchJobs]);
+
+  // Helper: parse newline-based eligibilities from textarea into string[]
+  const parseEligibilitiesFromTextarea = (text: string): string[] => {
+    return text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean);
+  };
 
   // Create job
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,8 +168,12 @@ Employment Type: ${formData.employment_type}
           title: formData.position,
           description: description,
           degree_requirement: formData.degree,
-          eligibilities: formData.eligibilities.split(',').map(e => e.trim()).filter(Boolean),
-          skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
+          // ✅ NEW: newline-based eligibilities → array
+          eligibilities: parseEligibilitiesFromTextarea(formData.eligibilities),
+          skills: formData.skills
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean),
           years_of_experience: 0, // Will be calculated from experience string in backend
           experience: formData.experience,
           location: formData.location,
@@ -168,7 +216,8 @@ Employment Type: ${formData.employment_type}
     setFormData({
       position: job._raw.title,
       degree: job._raw.degree_requirement,
-      eligibilities: job._raw.eligibilities.join(', '),
+      // ✅ NEW: show each requirement as its own line
+      eligibilities: job._raw.eligibilities.join('\n'),
       skills: job._raw.skills.join(', '),
       experience: job._raw.experience || `${job._raw.years_of_experience}`,
       location: job._raw.location || 'Asuncion Municipal Hall',
@@ -213,8 +262,12 @@ Employment Type: ${formData.employment_type}
           title: formData.position,
           description: description,
           degree_requirement: formData.degree,
-          eligibilities: formData.eligibilities.split(',').map(e => e.trim()).filter(Boolean),
-          skills: formData.skills.split(',').map(s => s.trim()).filter(Boolean),
+          // ✅ NEW: newline-based eligibilities → array
+          eligibilities: parseEligibilitiesFromTextarea(formData.eligibilities),
+          skills: formData.skills
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean),
           years_of_experience: 0, // Will be calculated from experience string in backend
           experience: formData.experience,
           location: formData.location,
@@ -350,9 +403,10 @@ Employment Type: ${formData.employment_type}
       const result = await response.json();
 
       if (result.success) {
-        const deletedMsg = result.deletedApplications > 0
-          ? `Job and ${result.deletedApplications} application(s) permanently deleted`
-          : 'Job permanently deleted';
+        const deletedMsg =
+          result.deletedApplications > 0
+            ? `Job and ${result.deletedApplications} application(s) permanently deleted`
+            : 'Job permanently deleted';
         showToast(deletedMsg, 'success');
         setShowDeleteConfirm(false);
         setJobToDelete(null);
@@ -383,7 +437,7 @@ Employment Type: ${formData.employment_type}
     }
   };
 
-  // Handle Toggle Skills Expansion
+  // Handle Toggle Skills/Eligibilities Expansion
   const toggleSkillsExpansion = (jobId: string) => {
     setExpandedSkillsCards(prev => {
       const newSet = new Set(prev);
@@ -405,7 +459,7 @@ Employment Type: ${formData.employment_type}
           <Briefcase className="w-4 h-4 text-[#22A555]" />
           <span className="font-medium text-gray-900">{value}</span>
         </div>
-      )
+      ),
     },
     {
       header: 'Degree Requirements',
@@ -415,7 +469,7 @@ Employment Type: ${formData.employment_type}
           <GraduationCap className="w-4 h-4 text-gray-400" />
           <span className="text-sm text-gray-700">{value}</span>
         </div>
-      )
+      ),
     },
     {
       header: 'Eligibilities',
@@ -439,14 +493,14 @@ Employment Type: ${formData.employment_type}
               <button
                 onClick={() => toggleSkillsExpansion(row.id)}
                 className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors cursor-pointer"
-                title={isExpanded ? "Click to show less" : "Click to view all eligibilities"}
+                title={isExpanded ? 'Click to show less' : 'Click to view all eligibilities'}
               >
                 {isExpanded ? 'Show less' : `+${totalCount - shownCount} more`}
               </button>
             )}
           </div>
         );
-      }
+      },
     },
     {
       header: 'Skills',
@@ -470,14 +524,14 @@ Employment Type: ${formData.employment_type}
               <button
                 onClick={() => toggleSkillsExpansion(row.id)}
                 className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors cursor-pointer"
-                title={isExpanded ? "Click to show less" : "Click to view all skills"}
+                title={isExpanded ? 'Click to show less' : 'Click to view all skills'}
               >
                 {isExpanded ? 'Show less' : `+${totalCount - shownCount} more`}
               </button>
             )}
           </div>
         );
-      }
+      },
     },
     { header: 'Experience', accessor: 'experience' as const },
     {
@@ -503,7 +557,7 @@ Employment Type: ${formData.employment_type}
             </Badge>
           );
         }
-      }
+      },
     },
     {
       header: 'Actions',
@@ -565,7 +619,7 @@ Employment Type: ${formData.employment_type}
         ];
 
         return <DropdownMenu items={menuItems} />;
-      }
+      },
     },
   ];
 
@@ -585,12 +639,22 @@ Employment Type: ${formData.employment_type}
   const totalCount = jobs.length;
 
   return (
-    <AdminLayout role="HR" userName={user?.fullName || "HR Admin"} pageTitle="Job Management" pageDescription="Create and manage job postings">
+    <AdminLayout
+      role="HR"
+      userName={user?.fullName || 'HR Admin'}
+      pageTitle="Job Management"
+      pageDescription="Create and manage job postings"
+    >
       <Container size="xl">
         <div className="space-y-6">
           {/* Action Buttons */}
           <div className="flex items-center justify-between">
-            <Button variant="primary" size="md" icon={Plus} onClick={() => setShowAddModal(true)}>
+            <Button
+              variant="primary"
+              size="md"
+              icon={Plus}
+              onClick={() => setShowAddModal(true)}
+            >
               Add New Job
             </Button>
             <RefreshButton onRefresh={fetchJobs} label="Refresh" showLastRefresh={true} />
@@ -599,7 +663,10 @@ Employment Type: ${formData.employment_type}
           {/* Summary Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Active Jobs */}
-            <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500">
+            <Card
+              variant="flat"
+              className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Active Jobs</p>
@@ -612,7 +679,10 @@ Employment Type: ${formData.employment_type}
             </Card>
 
             {/* Hidden Jobs */}
-            <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500">
+            <Card
+              variant="flat"
+              className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Hidden Jobs</p>
@@ -625,7 +695,10 @@ Employment Type: ${formData.employment_type}
             </Card>
 
             {/* Archived Jobs */}
-            <Card variant="flat" className="bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-500">
+            <Card
+              variant="flat"
+              className="bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-500"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Archived Jobs</p>
@@ -638,7 +711,10 @@ Employment Type: ${formData.employment_type}
             </Card>
 
             {/* Total Jobs */}
-            <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500">
+            <Card
+              variant="flat"
+              className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500"
+            >
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Jobs</p>
@@ -746,7 +822,13 @@ Employment Type: ${formData.employment_type}
                 <div className="bg-gradient-to-r from-[#22A555] to-[#1a8045] px-6 py-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                      <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                      <Image
+                        src="/JS-logo.png"
+                        alt="JobSync"
+                        width={40}
+                        height={40}
+                        className="rounded-lg object-cover"
+                      />
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-white">Create Job Post</h2>
@@ -768,41 +850,69 @@ Employment Type: ${formData.employment_type}
                       label="Position/Job Title"
                       type="text"
                       value={formData.position}
-                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                      placeholder="e.g., IT Assistant Technician"
+                      onChange={e => setFormData({ ...formData, position: e.target.value })}
+                      placeholder="Administrative Officer II"
                       required
                       disabled={submitting}
                     />
 
-                    <Textarea
-                      label="Degree Requirements"
-                      value={formData.degree}
-                      onChange={(e) => setFormData({ ...formData, degree: e.target.value })}
-                      placeholder="e.g., Bachelor of Science in Information Technology"
-                      rows={2}
-                      required
-                      disabled={submitting}
-                    />
+                    {/* DEGREE REQUIREMENTS – ADD */}
+                    <div>
+                      <Textarea
+                        label="Degree Requirements"
+                        value={formData.degree}
+                        onChange={e => setFormData({ ...formData, degree: e.target.value })}
+                        placeholder="Bachelor of Public Administration or Bachelor of Science in Business Administration"
+                        rows={2}
+                        required
+                        disabled={submitting}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Use <span className="font-semibold">“or”</span> if any one degree is
+                        acceptable; use <span className="font-semibold">“and”</span> only if all
+                        degrees are required.
+                      </p>
+                    </div>
 
-                    <Textarea
-                      label="Eligibilities (comma-separated)"
-                      value={formData.eligibilities}
-                      onChange={(e) => setFormData({ ...formData, eligibilities: e.target.value })}
-                      placeholder="e.g., CS Professional, Certified IT Professional"
-                      rows={2}
-                      required
-                      disabled={submitting}
-                    />
+                    {/* ELIGIBILITIES – ADD (newline-based) */}
+                    <div>
+                      <Textarea
+                        label="Eligibility Requirements"
+                        value={formData.eligibilities}
+                        onChange={e =>
+                          setFormData({ ...formData, eligibilities: e.target.value })
+                        }
+                        placeholder={
+                          'Career Service Professional Eligibility\nBarangay Official Eligibility or PD 907 (Honor Graduate Eligibility)'
+                        }
+                        rows={3}
+                        required
+                        disabled={submitting}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Enter <span className="font-semibold">one eligibility requirement per line</span>.
+                        Use <span className="font-semibold">“or”</span> for
+                        “any-of” groups and <span className="font-semibold">“and”</span> when all
+                        items in that line are required.
+                      </p>
+                    </div>
 
-                    <Textarea
-                      label="Skills (comma-separated)"
-                      value={formData.skills}
-                      onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-                      placeholder="e.g., Programming, Network Administration, Database Management"
-                      rows={2}
-                      required
-                      disabled={submitting}
-                    />
+                    {/* SKILLS – ADD */}
+                    <div>
+                      <Textarea
+                        label="Skills Requirements"
+                        value={formData.skills}
+                        onChange={e => setFormData({ ...formData, skills: e.target.value })}
+                        placeholder="Records classification, Document tracking, FOI basics, Data Privacy Act compliance"
+                        rows={2}
+                        required
+                        disabled={submitting}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        List one skill per item, separated by commas. The system also detects related
+                        skills using AI.
+                      </p>
+                    </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -810,7 +920,9 @@ Employment Type: ${formData.employment_type}
                       </label>
                       <select
                         value={formData.experience}
-                        onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                        onChange={e =>
+                          setFormData({ ...formData, experience: e.target.value })
+                        }
                         className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white transition-colors"
                         required
                         disabled={submitting}
@@ -830,14 +942,18 @@ Employment Type: ${formData.employment_type}
                           label="Location"
                           type="text"
                           value={formData.location}
-                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                          onChange={e =>
+                            setFormData({ ...formData, location: e.target.value })
+                          }
                           disabled={submitting}
                         />
                         <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={formData.remote}
-                            onChange={(e) => setFormData({ ...formData, remote: e.target.checked })}
+                            onChange={e =>
+                              setFormData({ ...formData, remote: e.target.checked })
+                            }
                             className="w-4 h-4 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555]"
                             disabled={submitting}
                           />
@@ -851,7 +967,9 @@ Employment Type: ${formData.employment_type}
                         </label>
                         <select
                           value={formData.employment_type}
-                          onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
+                          onChange={e =>
+                            setFormData({ ...formData, employment_type: e.target.value })
+                          }
                           className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white transition-colors"
                           required
                           disabled={submitting}
@@ -901,7 +1019,13 @@ Employment Type: ${formData.employment_type}
                 <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 px-6 py-5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                      <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                      <Image
+                        src="/JS-logo.png"
+                        alt="JobSync"
+                        width={40}
+                        height={40}
+                        className="rounded-lg object-cover"
+                      />
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-white">Edit Job Post</h2>
@@ -926,41 +1050,69 @@ Employment Type: ${formData.employment_type}
                       label="Position/Job Title"
                       type="text"
                       value={formData.position}
-                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                      placeholder="e.g., IT Assistant Technician"
+                      onChange={e => setFormData({ ...formData, position: e.target.value })}
+                      placeholder="Administrative Officer II"
                       required
                       disabled={submitting}
                     />
 
-                    <Textarea
-                      label="Degree Requirements"
-                      value={formData.degree}
-                      onChange={(e) => setFormData({ ...formData, degree: e.target.value })}
-                      placeholder="e.g., Bachelor of Science in Information Technology"
-                      rows={2}
-                      required
-                      disabled={submitting}
-                    />
+                    {/* DEGREE REQUIREMENTS – EDIT */}
+                    <div>
+                      <Textarea
+                        label="Degree Requirements"
+                        value={formData.degree}
+                        onChange={e => setFormData({ ...formData, degree: e.target.value })}
+                        placeholder="Bachelor of Public Administration or Bachelor of Science in Business Administration"
+                        rows={2}
+                        required
+                        disabled={submitting}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Use <span className="font-semibold">“or”</span> if any one degree is
+                        acceptable; use <span className="font-semibold">“and”</span> only if all
+                        degrees are required.
+                      </p>
+                    </div>
 
-                    <Textarea
-                      label="Eligibilities (comma-separated)"
-                      value={formData.eligibilities}
-                      onChange={(e) => setFormData({ ...formData, eligibilities: e.target.value })}
-                      placeholder="e.g., CS Professional, Certified IT Professional"
-                      rows={2}
-                      required
-                      disabled={submitting}
-                    />
+                    {/* ELIGIBILITIES – EDIT (newline-based) */}
+                    <div>
+                      <Textarea
+                        label="Eligibility Requirements"
+                        value={formData.eligibilities}
+                        onChange={e =>
+                          setFormData({ ...formData, eligibilities: e.target.value })
+                        }
+                        placeholder={
+                          'Career Service Professional Eligibility\nBar/Board Eligibility under RA 1080 or PD 907 (Honor Graduate Eligibility)'
+                        }
+                        rows={3}
+                        required
+                        disabled={submitting}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Enter <span className="font-semibold">one eligibility requirement per line</span>.
+                        Use <span className="font-semibold">“or”</span> for
+                        “any-of” groups and <span className="font-semibold">“and”</span> when all
+                        items in that line are required.
+                      </p>
+                    </div>
 
-                    <Textarea
-                      label="Skills (comma-separated)"
-                      value={formData.skills}
-                      onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-                      placeholder="e.g., Programming, Network Administration, Database Management"
-                      rows={2}
-                      required
-                      disabled={submitting}
-                    />
+                    {/* SKILLS – EDIT */}
+                    <div>
+                      <Textarea
+                        label="Skills Requirements"
+                        value={formData.skills}
+                        onChange={e => setFormData({ ...formData, skills: e.target.value })}
+                        placeholder="Records classification, Document tracking, FOI basics, Data Privacy Act compliance"
+                        rows={2}
+                        required
+                        disabled={submitting}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        List one skill per item, separated by commas. The system also detects related
+                        skills using AI.
+                      </p>
+                    </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -968,7 +1120,9 @@ Employment Type: ${formData.employment_type}
                       </label>
                       <select
                         value={formData.experience}
-                        onChange={(e) => setFormData({ ...formData, experience: e.target.value })}
+                        onChange={e =>
+                          setFormData({ ...formData, experience: e.target.value })
+                        }
                         className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white transition-colors"
                         required
                         disabled={submitting}
@@ -988,14 +1142,18 @@ Employment Type: ${formData.employment_type}
                           label="Location"
                           type="text"
                           value={formData.location}
-                          onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                          onChange={e =>
+                            setFormData({ ...formData, location: e.target.value })
+                          }
                           disabled={submitting}
                         />
                         <label className="flex items-center gap-2 mt-2 text-sm text-gray-700 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={formData.remote}
-                            onChange={(e) => setFormData({ ...formData, remote: e.target.checked })}
+                            onChange={e =>
+                              setFormData({ ...formData, remote: e.target.checked })
+                            }
                             className="w-4 h-4 text-[#22A555] border-gray-300 rounded focus:ring-[#22A555]"
                             disabled={submitting}
                           />
@@ -1009,7 +1167,9 @@ Employment Type: ${formData.employment_type}
                         </label>
                         <select
                           value={formData.employment_type}
-                          onChange={(e) => setFormData({ ...formData, employment_type: e.target.value })}
+                          onChange={e =>
+                            setFormData({ ...formData, employment_type: e.target.value })
+                          }
                           className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#22A555] bg-white transition-colors"
                           required
                           disabled={submitting}
@@ -1064,7 +1224,13 @@ Employment Type: ${formData.employment_type}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                        <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                        <Image
+                          src="/JS-logo.png"
+                          alt="JobSync"
+                          width={40}
+                          height={40}
+                          className="rounded-lg object-cover"
+                        />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">Hide Job Posting</h3>
@@ -1091,9 +1257,12 @@ Employment Type: ${formData.employment_type}
                     <div className="flex items-start gap-3">
                       <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-semibold text-amber-800 mb-1">Warning: Hide Job Posting</p>
+                        <p className="font-semibold text-amber-800 mb-1">
+                          Warning: Hide Job Posting
+                        </p>
                         <p className="text-sm text-amber-700">
-                          This will hide the job from applicants. They will no longer be able to view or apply to this position.
+                          This will hide the job from applicants. They will no longer be able to view
+                          or apply to this position.
                         </p>
                         <ul className="text-sm text-amber-700 list-disc list-inside mt-2 space-y-1">
                           <li>Job will be removed from public view</li>
@@ -1118,7 +1287,10 @@ Employment Type: ${formData.employment_type}
                       </div>
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-gray-400" />
-                        <Badge variant={jobToHide.status === 'Active' ? 'success' : 'warning'} className="text-xs">
+                        <Badge
+                          variant={jobToHide.status === 'Active' ? 'success' : 'warning'}
+                          className="text-xs"
+                        >
                           {jobToHide.status}
                         </Badge>
                       </div>
@@ -1163,11 +1335,19 @@ Employment Type: ${formData.employment_type}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                        <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                        <Image
+                          src="/JS-logo.png"
+                          alt="JobSync"
+                          width={40}
+                          height={40}
+                          className="rounded-lg object-cover"
+                        />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">Archive Job Posting</h3>
-                        <p className="text-sm text-white/90">Job will be hidden but can be restored</p>
+                        <p className="text-sm text-white/90">
+                          Job will be hidden but can be restored
+                        </p>
                       </div>
                     </div>
                     <button
@@ -1192,7 +1372,8 @@ Employment Type: ${formData.employment_type}
                       <div>
                         <p className="font-semibold text-blue-800 mb-1">Archiving Job</p>
                         <p className="text-sm text-blue-700">
-                          This job will be archived and hidden from applicants. You can restore it later from the Archived tab.
+                          This job will be archived and hidden from applicants. You can restore it
+                          later from the Archived tab.
                         </p>
                       </div>
                     </div>
@@ -1251,11 +1432,19 @@ Employment Type: ${formData.employment_type}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                        <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                        <Image
+                          src="/JS-logo.png"
+                          alt="JobSync"
+                          width={40}
+                          height={40}
+                          className="rounded-lg object-cover"
+                        />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">⚠️ Permanently Delete Job</h3>
-                        <p className="text-sm text-white/90">This action CANNOT be undone!</p>
+                        <p className="text-sm text-white/90">
+                          This action CANNOT be undone!
+                        </p>
                       </div>
                     </div>
                     <button
@@ -1286,8 +1475,13 @@ Employment Type: ${formData.employment_type}
                         </p>
                         <p className="text-sm text-red-700 mb-2">This will permanently delete:</p>
                         <ul className="text-sm text-red-800 list-disc list-inside space-y-1">
-                          <li>The job posting: <span className="font-semibold">{jobToDelete.position}</span></li>
-                          <li className="font-bold text-red-900">ALL {applicationCount} application(s) for this job</li>
+                          <li>
+                            The job posting:{' '}
+                            <span className="font-semibold">{jobToDelete.position}</span>
+                          </li>
+                          <li className="font-bold text-red-900">
+                            ALL {applicationCount} application(s) for this job
+                          </li>
                           <li>All historical data and records</li>
                         </ul>
                         <p className="text-sm text-red-900 font-bold mt-3">
@@ -1299,7 +1493,9 @@ Employment Type: ${formData.employment_type}
 
                   {/* Job Info */}
                   <div className="bg-gray-50 p-4 rounded-lg border border-gray-300">
-                    <p className="text-sm text-gray-600 mb-2 font-semibold">Job to be permanently deleted:</p>
+                    <p className="text-sm text-gray-600 mb-2 font-semibold">
+                      Job to be permanently deleted:
+                    </p>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Briefcase className="w-4 h-4 text-gray-400" />
@@ -1315,12 +1511,16 @@ Employment Type: ${formData.employment_type}
                   {/* Confirmation Input */}
                   <div className="space-y-2">
                     <label className="block text-sm font-semibold text-gray-900">
-                      Type <span className="text-red-600 font-mono bg-red-50 px-2 py-0.5 rounded">DELETE</span> to confirm permanent deletion:
+                      Type{' '}
+                      <span className="text-red-600 font-mono bg-red-50 px-2 py-0.5 rounded">
+                        DELETE
+                      </span>{' '}
+                      to confirm permanent deletion:
                     </label>
                     <Input
                       type="text"
                       value={deleteConfirmText}
-                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      onChange={e => setDeleteConfirmText(e.target.value)}
                       placeholder="Type DELETE to confirm"
                       className="font-mono"
                       disabled={submitting}
@@ -1367,7 +1567,13 @@ Employment Type: ${formData.employment_type}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
-                        <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
+                        <Image
+                          src="/JS-logo.png"
+                          alt="JobSync"
+                          width={40}
+                          height={40}
+                          className="rounded-lg object-cover"
+                        />
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-white">Restore Job Posting</h3>
@@ -1394,9 +1600,12 @@ Employment Type: ${formData.employment_type}
                     <div className="flex items-start gap-3">
                       <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-semibold text-green-800 mb-1">Restore Job to Active</p>
+                        <p className="font-semibold text-green-800 mb-1">
+                          Restore Job to Active
+                        </p>
                         <p className="text-sm text-green-700">
-                          This will make the job posting visible and allow applicants to view and apply.
+                          This will make the job posting visible and allow applicants to view and
+                          apply.
                         </p>
                         <ul className="text-sm text-green-700 list-disc list-inside mt-2 space-y-1">
                           <li>Job will appear in public listings</li>

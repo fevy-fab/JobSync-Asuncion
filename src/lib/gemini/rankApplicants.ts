@@ -12,9 +12,10 @@ import {
   algorithm3_EligibilityEducationTiebreaker,
   type JobRequirements,
   type ApplicantData,
-  type ScoreBreakdown
+  type ScoreBreakdown,
 } from './scoringAlgorithms';
 import { findTieGroups, breakTiesWithAI, type TieBreakResult } from './aiTieBreaker';
+import { normalizeJobAndApplicant } from './normalization';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
@@ -48,6 +49,8 @@ export interface RankedApplicant {
 
 /**
  * Rank all applicants for a specific job using ensemble scoring
+ * Now with degree/eligibility canonicalization via YAML + Gemini classifier,
+ * and SBERT-enhanced skill similarity.
  */
 export async function rankApplicantsForJob(
   job: {
@@ -70,68 +73,80 @@ export async function rankApplicantsForJob(
     workExperienceTitles?: string[];
   }>
 ): Promise<RankedApplicant[]> {
-  // Score all applicants
-  const scoredApplicants = applicants.map(applicant => {
-    const jobReq = {
-      title: job.title,
-      description: job.description,
-      degreeRequirement: job.degreeRequirement,
-      eligibilities: job.eligibilities,
-      skills: job.skills,
-      yearsOfExperience: job.yearsOfExperience
-    };
-
-    const applicantData = {
-      highestEducationalAttainment: applicant.highestEducationalAttainment,
-      eligibilities: applicant.eligibilities,
-      skills: applicant.skills,
-      totalYearsExperience: applicant.totalYearsExperience,
-      workExperienceTitles: applicant.workExperienceTitles
-    };
-
-    // Get individual algorithm scores
-    const score1 = algorithm1_WeightedSum(jobReq, applicantData);
-    const score2 = algorithm2_SkillExperienceComposite(jobReq, applicantData);
-    const scoreDiff = Math.abs(score1.totalScore - score2.totalScore);
-
-    // Get ensemble score
-    const score = ensembleScore(jobReq, applicantData);
-
-    // Determine algorithm details
-    let algorithmDetails: AlgorithmDetails;
-
-    if (scoreDiff <= 5) {
-      // Tie-breaker used
-      const score3 = algorithm3_EligibilityEducationTiebreaker(jobReq, applicantData);
-      algorithmDetails = {
-        algorithm1Score: score1.totalScore,
-        algorithm2Score: score2.totalScore,
-        algorithm3Score: score3.totalScore,
-        ensembleMethod: 'tie_breaker',
-        isTieBreaker: true,
-        scoreDifference: scoreDiff
+  // Score all applicants (now async because of normalization + Gemini + SBERT)
+  const scoredApplicants = await Promise.all(
+    applicants.map(async applicant => {
+      const jobReq: JobRequirements = {
+        title: job.title,
+        description: job.description,
+        degreeRequirement: job.degreeRequirement,
+        eligibilities: job.eligibilities,
+        skills: job.skills,
+        yearsOfExperience: job.yearsOfExperience,
       };
-    } else {
-      // Weighted average used
-      algorithmDetails = {
-        algorithm1Score: score1.totalScore,
-        algorithm2Score: score2.totalScore,
-        ensembleMethod: 'weighted_average',
-        algorithm1Weight: 0.6,
-        algorithm2Weight: 0.4,
-        isTieBreaker: false,
-        scoreDifference: scoreDiff
+
+      const applicantData: ApplicantData = {
+        highestEducationalAttainment: applicant.highestEducationalAttainment,
+        eligibilities: applicant.eligibilities,
+        skills: applicant.skills,
+        totalYearsExperience: applicant.totalYearsExperience,
+        workExperienceTitles: applicant.workExperienceTitles,
       };
-    }
 
-    return {
-      ...applicant,
-      ...score,
-      algorithmDetails
-    };
-  });
+      // 🔹 Normalize degrees + eligibilities using YAML + Gemini classifier
+      const { job: normalizedJobReq, applicant: normalizedApplicantData } =
+        await normalizeJobAndApplicant(jobReq, applicantData);
 
-  // Sort by total score (descending) with tie-breaking
+      // Get individual algorithm scores (using normalized data)
+      const score1 = await algorithm1_WeightedSum(normalizedJobReq, normalizedApplicantData);
+      const score2 = await algorithm2_SkillExperienceComposite(
+        normalizedJobReq,
+        normalizedApplicantData
+      );
+      const scoreDiff = Math.abs(score1.totalScore - score2.totalScore);
+
+      // Get ensemble score
+      const score = await ensembleScore(normalizedJobReq, normalizedApplicantData);
+
+      // Determine algorithm details
+      let algorithmDetails: AlgorithmDetails;
+
+      if (scoreDiff <= 5) {
+        // Tie-breaker used
+        const score3 = await algorithm3_EligibilityEducationTiebreaker(
+          normalizedJobReq,
+          normalizedApplicantData
+        );
+        algorithmDetails = {
+          algorithm1Score: score1.totalScore,
+          algorithm2Score: score2.totalScore,
+          algorithm3Score: score3.totalScore,
+          ensembleMethod: 'tie_breaker',
+          isTieBreaker: true,
+          scoreDifference: scoreDiff,
+        };
+      } else {
+        // Weighted average used
+        algorithmDetails = {
+          algorithm1Score: score1.totalScore,
+          algorithm2Score: score2.totalScore,
+          ensembleMethod: 'weighted_average',
+          algorithm1Weight: 0.6,
+          algorithm2Weight: 0.4,
+          isTieBreaker: false,
+          scoreDifference: scoreDiff,
+        };
+      }
+
+      return {
+        ...applicant,
+        ...score,
+        algorithmDetails,
+      };
+    })
+  );
+
+  // Sort by total score (descending) with tie-breaking (unchanged)
   const sortedApplicants = scoredApplicants.sort((a, b) => {
     // Primary: Total match score
     if (Math.abs(b.totalScore - a.totalScore) >= 0.01) {
@@ -190,12 +205,17 @@ export async function rankApplicantsForJob(
       totalYearsExperience: app.totalYearsExperience,
       skills: app.skills,
       eligibilities: app.eligibilities,
-      workExperienceTitles: app.workExperienceTitles
+      workExperienceTitles: app.workExperienceTitles,
     }))
   );
 
   if (tieGroups.length > 0) {
-    console.log(`   Found ${tieGroups.length} tie groups with ${tieGroups.reduce((sum, g) => sum + g.applicants.length, 0)} total tied candidates`);
+    console.log(
+      `   Found ${tieGroups.length} tie groups with ${tieGroups.reduce(
+        (sum, g) => sum + g.applicants.length,
+        0
+      )} total tied candidates`
+    );
 
     // Break ties using AI
     const tieBreakResults = await breakTiesWithAI(tieGroups, job.title, job.description);
@@ -232,10 +252,10 @@ export async function rankApplicantsForJob(
     rankingReasoning: applicant.reasoning,
     algorithmDetails: applicant.algorithmDetails,
     matchedSkillsCount: applicant.matchedSkillsCount,
-    matchedEligibilitiesCount: applicant.matchedEligibilitiesCount
+    matchedEligibilitiesCount: applicant.matchedEligibilitiesCount,
   }));
 
-  // Get Gemini AI insights for top 5 candidates
+  // Get Gemini AI insights for top 5 candidates (unchanged)
   if (rankedApplicants.length > 0) {
     try {
       await addGeminiInsights(job, rankedApplicants.slice(0, Math.min(5, rankedApplicants.length)));
@@ -268,12 +288,20 @@ Requirements:
 - Eligibilities: ${job.eligibilities.join(', ')}
 
 Top ${topCandidates.length} Candidates (already scored):
-${topCandidates.map((c, i) => `
+${topCandidates
+  .map(
+    (c, i) => `
 ${i + 1}. ${c.applicantName}
    - Match Score: ${c.matchScore.toFixed(1)}%
    - Algorithm: ${c.algorithmUsed}
-   - Scoring: Education ${c.educationScore.toFixed(1)}%, Experience ${c.experienceScore.toFixed(1)}%, Skills ${c.skillsScore.toFixed(1)}%, Eligibility ${c.eligibilityScore.toFixed(1)}%
-`).join('\n')}
+   - Scoring: Education ${c.educationScore.toFixed(
+     1
+   )}%, Experience ${c.experienceScore.toFixed(1)}%, Skills ${c.skillsScore.toFixed(
+     1
+   )}%, Eligibility ${c.eligibilityScore.toFixed(1)}%
+`
+  )
+  .join('\n')}
 
 For each candidate, provide a brief (2-3 sentences) professional insight about their fit for this role. Focus on:
 1. Key strengths that make them suitable
@@ -314,39 +342,3 @@ export async function reRankJobApplicants(jobId: string): Promise<RankedApplican
   // The API will fetch the job and applicants from the database
   throw new Error('Use the API endpoint /api/jobs/[id]/rank to re-rank applicants');
 }
-
-/**
- * Compare two applicants directly (for debugging/testing)
- */
-export function compareApplicants(
-  job: JobRequirements,
-  applicant1: ApplicantData,
-  applicant2: ApplicantData
-): {
-  winner: 'applicant1' | 'applicant2' | 'tie';
-  applicant1Score: ScoreBreakdown;
-  applicant2Score: ScoreBreakdown;
-  analysis: string;
-} {
-  const score1 = ensembleScore(job, applicant1);
-  const score2 = ensembleScore(job, applicant2);
-
-  const diff = score1.totalScore - score2.totalScore;
-
-  let winner: 'applicant1' | 'applicant2' | 'tie';
-  if (Math.abs(diff) < 1) {
-    winner = 'tie';
-  } else if (diff > 0) {
-    winner = 'applicant1';
-  } else {
-    winner = 'applicant2';
-  }
-
-  return {
-    winner,
-    applicant1Score: score1,
-    applicant2Score: score2,
-    analysis: `Applicant 1: ${score1.totalScore.toFixed(2)} vs Applicant 2: ${score2.totalScore.toFixed(2)}. Difference: ${Math.abs(diff).toFixed(2)} points.`
-  };
-}
-

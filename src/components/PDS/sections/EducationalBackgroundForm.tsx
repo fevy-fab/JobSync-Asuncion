@@ -78,7 +78,7 @@ export const EducationalBackgroundForm: React.FC<EducationalBackgroundFormProps>
         onRemove={remove}
         addButtonLabel="Add Education"
         minItems={1}
-        maxItems={10}
+        maxItems={5}
         emptyMessage="At least one educational background entry is required."
         renderItem={(field, index) => (
           <div className="space-y-4">
@@ -228,7 +228,7 @@ export const EducationalBackgroundForm: React.FC<EducationalBackgroundFormProps>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <p className="text-sm text-blue-700">
-          <strong>Tip:</strong> Start with Elementary and add entries in chronological order.
+          <strong>Note:</strong> Please write all information in full. Do not use abbreviations, initials, or shortened forms. Start with Elementary and add entries in chronological order.
           At least one educational background entry is required.
         </p>
       </div>

@@ -335,7 +335,7 @@ export const FamilyBackgroundForm: React.FC<FamilyBackgroundFormProps> = ({
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
         <p className="text-sm text-blue-700">
-          <strong>Note:</strong> Father's and Mother's information are required fields.
+          <strong>Note:</strong> Please write all information in full. Do not use abbreviations, initials, or shortened forms. Father's and Mother's information are required fields.
           Spouse information should be filled out if you are married, widowed, or separated.
         </p>
       </div>

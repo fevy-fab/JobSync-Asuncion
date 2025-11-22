@@ -20,7 +20,8 @@ interface TrainingProgram {
   end_date?: string;
   skills_covered?: string[];
   icon?: string;
-  status: 'active' | 'upcoming' | 'completed' | 'cancelled' | 'archived';
+//  status: 'active' | 'upcoming' | 'completed' | 'cancelled' | 'archived';
+  status: 'active' | 'upcoming' | 'archived';
   created_by: string;
   created_at: string;
   profiles?: {
@@ -35,7 +36,8 @@ export default function PESOProgramsPage() {
   const [programs, setPrograms] = useState<TrainingProgram[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'upcoming' | 'completed' | 'cancelled' | 'archived'>('all');
+//  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'upcoming' | 'completed' | 'cancelled' | 'archived'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'upcoming' | 'archived'>('all');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -316,8 +318,8 @@ export default function PESOProgramsPage() {
     total: programs.length,
     active: programs.filter(p => p.status === 'active').length,
     upcoming: programs.filter(p => p.status === 'upcoming').length,
-    completed: programs.filter(p => p.status === 'completed').length,
-    cancelled: programs.filter(p => p.status === 'cancelled').length,
+//    completed: programs.filter(p => p.status === 'completed').length,
+//    cancelled: programs.filter(p => p.status === 'cancelled').length,
     archived: programs.filter(p => p.status === 'archived').length,
     totalEnrolled: programs.reduce((sum, p) => sum + p.enrolled_count, 0),
     totalCapacity: programs.reduce((sum, p) => sum + p.capacity, 0),
@@ -336,12 +338,12 @@ export default function PESOProgramsPage() {
         return { variant: 'success' as const, icon: CheckCircle2, label: 'Active' };
       case 'upcoming':
         return { variant: 'info' as const, icon: Clock, label: 'Upcoming' };
-      case 'completed':
-        return { variant: 'secondary' as const, icon: Archive, label: 'Completed' };
-      case 'cancelled':
-        return { variant: 'danger' as const, icon: X, label: 'Cancelled' };
+//      case 'completed':
+//        return { variant: 'secondary' as const, icon: Archive, label: 'Completed' };
+//      case 'cancelled':
+//        return { variant: 'danger' as const, icon: X, label: 'Cancelled' };
       case 'archived':
-        return { variant: 'secondary' as const, icon: Archive, label: 'Archived' };
+        return { variant: 'secondary' as const, icon: Archive, label: 'Completed' };
       default:
         return { variant: 'secondary' as const, icon: AlertCircle, label: status };
     }
@@ -425,8 +427,8 @@ export default function PESOProgramsPage() {
                 <Button variant="warning" size="sm" icon={Edit} onClick={() => handleEdit(row)}>
                   Edit
                 </Button>
-                <Button variant="danger" size="sm" icon={Archive} onClick={() => handleArchiveClick(row)}>
-                  Archive
+                <Button variant="secondary" size="sm" icon={Archive} onClick={() => handleArchiveClick(row)}>
+                  Complete
                 </Button>
               </>
             )}
@@ -499,30 +501,6 @@ export default function PESOProgramsPage() {
             </div>
           </Card>
 
-          <Card variant="flat" className="bg-gradient-to-br from-gray-50 to-gray-100 border-l-4 border-gray-500 hover:shadow-xl transition-all duration-300">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Completed</p>
-                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.completed}</p>
-              </div>
-              <div className="w-12 h-12 bg-gray-500 rounded-xl flex items-center justify-center shadow-lg">
-                <Archive className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="flat" className="bg-gradient-to-br from-red-50 to-red-100 border-l-4 border-red-500 hover:shadow-xl transition-all duration-300">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Cancelled</p>
-                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.cancelled}</p>
-              </div>
-              <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-lg">
-                <AlertCircle className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
           <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500 hover:shadow-xl transition-all duration-300">
             <div className="flex items-center justify-between">
               <div>
@@ -550,7 +528,7 @@ export default function PESOProgramsPage() {
           <Card variant="flat" className="bg-gradient-to-br from-slate-50 to-slate-100 border-l-4 border-slate-500 hover:shadow-xl transition-all duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Archived</p>
+                <p className="text-sm text-gray-600 mb-1">Completed</p>
                 <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.archived}</p>
               </div>
               <div className="w-12 h-12 bg-slate-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -581,27 +559,14 @@ export default function PESOProgramsPage() {
             >
               Active ({stats.active})
             </Button>
-            <Button
-              variant={statusFilter === 'completed' ? 'secondary' : 'secondary'}
-              size="sm"
-              onClick={() => setStatusFilter('completed')}
-            >
-              Completed ({stats.completed})
-            </Button>
-            <Button
-              variant={statusFilter === 'cancelled' ? 'danger' : 'secondary'}
-              size="sm"
-              onClick={() => setStatusFilter('cancelled')}
-            >
-              Cancelled ({stats.cancelled})
-            </Button>
+
             <Button
               variant={statusFilter === 'archived' ? 'secondary' : 'secondary'}
               size="sm"
               onClick={() => setStatusFilter('archived')}
             >
               <Archive className="w-4 h-4" />
-              Archived ({stats.archived})
+              Completed ({stats.archived})
             </Button>
           </div>
         </div>
@@ -861,7 +826,7 @@ export default function PESOProgramsPage() {
           {archivingProgram && (
             <div className="space-y-4">
               <p className="text-gray-600 text-center">
-                Are you sure you want to archive "<strong>{archivingProgram.title}</strong>"? You can restore it later from the Archived tab.
+                Are you sure you want to hide and mark it as completed "<strong>{archivingProgram.title}</strong>"? You can restore it later from the Completed tab.
               </p>
 
               <div className="flex gap-3 pt-4">
@@ -879,7 +844,7 @@ export default function PESOProgramsPage() {
                     onClick={handleArchive}
                     className="flex-1"
                   >
-                    {submitting ? 'Archiving...' : 'Archive Program'}
+                    {submitting ? 'Hiding...' : 'Hide Program'}
                   </Button>
                 </div>
             </div>
@@ -891,7 +856,7 @@ export default function PESOProgramsPage() {
           isOpen={showRestoreConfirm && restoringProgram !== null}
           onClose={() => { setShowRestoreConfirm(false); setRestoringProgram(null); }}
           title="Restore Training Program"
-          subtitle="Reactivate archived program"
+          subtitle="Reactivate hidden program"
           colorVariant="green"
           icon={Undo2}
           size="md"

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { generatePDSPDF } from '@/lib/pds/pdfGenerator';
 import { generateCSCFormatPDF } from '@/lib/pds/pdfGeneratorCSC';
 import { generatePDSExcel, generatePDSFilename } from '@/lib/pds/pdsExcelGenerator';
 import { transformPDSFromDatabase } from '@/lib/utils/dataTransformers';
 import fs from 'fs';
 import path from 'path';
+import { Buffer } from 'buffer';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +17,7 @@ export async function GET(
   try {
     const { id } = await params;
     const supabase = await createClient();
+    const adminClient = await createAdminClient();
 
     // Get the authenticated user
     const {
@@ -73,7 +75,51 @@ export async function GET(
     const useCurrentDate = request.nextUrl.searchParams.get('useCurrentDate') === 'true';
 
     // Transform database format (snake_case) to application format (camelCase)
-    const transformedPDSData = transformPDSFromDatabase(pdsData);
+    const transformedPDSData: any = transformPDSFromDatabase(pdsData);
+
+    // 🔹 If includeSignature is true and we have a signature file, hydrate signatureData for the PDF generators
+    if (includeSignature && pdsData.signature_url) {
+      try {
+        const { data: signedUrlData, error: signedUrlError } = await adminClient.storage
+          .from('pds-signatures')
+          .createSignedUrl(pdsData.signature_url, 60); // 60 seconds is plenty for a single embed
+
+        if (signedUrlError) {
+          console.error('❌ Error creating signed URL for signature:', signedUrlError);
+        } else if (signedUrlData?.signedUrl) {
+          const imageRes = await fetch(signedUrlData.signedUrl);
+
+          if (!imageRes.ok) {
+            console.error('❌ Failed to fetch signature image from signed URL:', imageRes.statusText);
+          } else {
+            const arrayBuf = await imageRes.arrayBuffer();
+            const base64 = Buffer.from(arrayBuf).toString('base64');
+
+            // Infer MIME type from response headers (fallback to PNG)
+            const contentType = imageRes.headers.get('content-type') || '';
+            let mimeType = 'image/png';
+            if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+              mimeType = 'image/jpeg';
+            } else if (contentType.includes('png')) {
+              mimeType = 'image/png';
+            }
+
+            const dataUrl = `data:${mimeType};base64,${base64}`;
+
+            // Ensure nested structure exists
+            transformedPDSData.otherInformation = transformedPDSData.otherInformation || {};
+            transformedPDSData.otherInformation.declaration =
+              transformedPDSData.otherInformation.declaration || {};
+
+            // This is what pdfGenerator.ts / pdfGeneratorCSC.ts already expect
+            transformedPDSData.otherInformation.declaration.signatureData = dataUrl;
+          }
+        }
+      } catch (sigError) {
+        console.error('❌ Error embedding signature into PDS data:', sigError);
+        // If anything fails, we just fall back to plain line (wet signature) in the PDF
+      }
+    }
 
     // Handle Excel export - GENERATE FILLED EXCEL FILE
     if (format === 'excel') {
@@ -84,7 +130,7 @@ export async function GET(
           transformedPDSData.personalInfo?.surname
         );
 
-        // 🔹 Pass useCurrentDate into the Excel generator
+        // Pass useCurrentDate into the Excel generator
         const excelBuffer = await generatePDSExcel(transformedPDSData, {
           useCurrentDate,
         });

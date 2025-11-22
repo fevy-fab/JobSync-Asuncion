@@ -762,7 +762,7 @@ export const PersonalInformationForm: React.FC<PersonalInformationFormProps> = (
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
         <p className="text-sm text-blue-700">
-          <strong>Note:</strong> Please ensure all information is accurate as it appears on your official government documents.
+          <strong>Note:</strong> Please ensure all information is accurate as it appears on your official government documents. Write all information in full. Do not use abbreviations, initials, or shortened forms.
           Required fields are marked with an asterisk (*). Your changes are saved automatically.
         </p>
       </div>
