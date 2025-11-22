@@ -1488,8 +1488,7 @@ export default function RankedRecordsPage() {
                     <Image src="/JS-logo.png" alt="JobSync" width={40} height={40} className="rounded-lg object-cover" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-white">Rank Applicants with Gemini AI</h3>
-                    <p className="text-sm text-white/90">AI-powered intelligent ranking</p>
+                    <h3 className="text-xl font-bold text-white">Rank Applicants with AI</h3>
                   </div>
                 </div>
                 <button
@@ -1512,9 +1511,9 @@ export default function RankedRecordsPage() {
                 <div className="flex items-start gap-3">
                   <Sparkles className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-semibold text-blue-800 mb-1">AI Ranking Process</p>
+                    <p className="font-semibold text-blue-800 mb-1">Ranking Process</p>
                     <p className="text-sm text-blue-700">
-                      Gemini AI will analyze and rank all pending applicants using advanced algorithms.
+                      Gemini + Advanced Scoring Algorithms will analyze and rank all pending applicants.
                     </p>
                   </div>
                 </div>
@@ -1531,7 +1530,7 @@ export default function RankedRecordsPage() {
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-700">
-                      All pending applicants will be ranked
+                      All pending applicants will be ranked.
                     </span>
                   </div>
                 </div>
@@ -1544,11 +1543,10 @@ export default function RankedRecordsPage() {
                   <p className="text-sm font-semibold text-blue-900">What Happens Next:</p>
                 </div>
                 <ul className="text-sm text-blue-800 space-y-1 ml-6 list-disc">
-                  <li>Analyzes education, experience, skills, and eligibilities</li>
-                  <li>Calculates match scores (0-100%) for each applicant</li>
-                  <li>Ranks applicants from best to least match</li>
-                  <li>Uses 3 AI algorithms with ensemble method</li>
-                  <li>Provides detailed reasoning for each score</li>
+                  <li>Analyzes education, experience, skills, and eligibilities.</li>
+                  <li>Calculates match scores (0-100%) for each applicant.</li>
+                  <li>Ranks applicants from best to least match.</li>
+                  <li>Uses 3 AI algorithms with ensemble method.</li>
                 </ul>
               </div>
 
