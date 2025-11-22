@@ -332,7 +332,7 @@ const generateEducationVerdict = (
 };
 
 /**
- * UPDATED: Skill summary text aligned with SBERT-based scoring and kept concise.
+ * UPDATED: Skill summary text aligned with SBERT-based scoring and scoring thresholds.
  */
 const describeSkillMatchSummary = (
   skillsScore: number,
@@ -362,7 +362,12 @@ const describeSkillMatchSummary = (
       )}%.`;
     }
 
+    // handle the case where SBERT/keywords see "related"
+    // but the final score is still 0 because of the threshold.
     if (strongMatches === 0 && relatedOnly > 0) {
+      if (skillsScore === 0) {
+        return `${relatedOnly} skills look related to the requirements (shared keywords/semantics), but they are below the similarity threshold used for scoring, so the skills score remains 0%.`;
+      }
       return `${relatedOnly} skills are semantically related to the requirements. The AI model gives partial credit, resulting in a skills score of ${skillsScore.toFixed(
         1
       )}%.`;
@@ -402,6 +407,8 @@ export function RankingDetailsModal({
   const [isAlgorithmInfoOpen, setIsAlgorithmInfoOpen] = useState(false);
 
   if (!applicant) return null;
+
+  const hasNonZeroSkillsScore = applicant.skillsScore > 0;
 
   const skillMatchPairs =
     jobRequirements &&
@@ -972,8 +979,9 @@ export function RankingDetailsModal({
                 <p className="text-xs text-gray-600">
                   {skillsSummaryText}{' '}
                   Note: the skills score uses an AI semantic similarity model (SBERT),
-                  so related skills can earn partial points, but direct matches still
-                  contribute the most.
+                  so related skills that pass a minimum similarity threshold can earn
+                  partial points. If the similarity is too weak, they are shown as
+                  “related” but still score 0%.
                 </p>
               )}
               {applicant.percentiles && applicant.totalApplicants && (
@@ -1051,8 +1059,7 @@ export function RankingDetailsModal({
                     return (
                       <>
                         <span>
-                          Applicant has {matched} relevant eligibilit
-ies, but at least one
+                          Applicant has {matched} relevant eligibilities, but at least one
                           requirement group is still incomplete, so the eligibility score
                           remains at 0% until all required groups are met.
                         </span>
@@ -1312,9 +1319,20 @@ ies, but at least one
                             })}
                           </div>
                           <p className="text-xs text-gray-600 mt-2">
-                            Skills score shown above already includes both direct matches
-                            and SBERT-based related skills, so you may see a non-zero
-                            score even if there are few exact keyword matches.
+                            {hasNonZeroSkillsScore ? (
+                              <>
+                                Skills score shown above already includes both direct
+                                matches and SBERT-based related skills that pass the
+                                similarity threshold, so you may see a non-zero score even
+                                if there are few exact keyword matches.
+                              </>
+                            ) : (
+                              <>
+                                Some skills look loosely related (shared
+                                keywords/semantics), but they did not pass the similarity
+                                threshold used for scoring, so the skills score remains 0%.
+                              </>
+                            )}
                           </p>
                         </div>
                       ) : (
