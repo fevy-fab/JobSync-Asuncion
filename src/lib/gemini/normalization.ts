@@ -4,8 +4,15 @@ import yaml from 'js-yaml';
 
 import { generateContent, parseGeminiJSON } from './client';
 import type { JobRequirements, ApplicantData } from './scoringAlgorithms';
+import {
+  getBgeEmbedding,
+  getBgeEmbeddingsBatch,
+  cosineSimilarity,
+  type Embedding,
+} from '../semantic/bgeDegreesEligibilities';
 
 type NormalizedKey = string;
+type NormalizationMethod = 'dictionary' | 'embedding' | 'gemini' | 'fallback';
 
 interface CanonicalDegree {
   key: string;
@@ -24,7 +31,7 @@ interface CanonicalEligibility {
 
 interface NormalizationResult {
   canonicalKey?: string;
-  method: 'dictionary' | 'gemini' | 'fallback';
+  method: NormalizationMethod;
   confidence: number; // 0–1
   raw: string;
 }
@@ -41,6 +48,12 @@ interface GeminiEligibilityClassificationResponse {
   reasoning?: string;
 }
 
+interface BgeMatchResult {
+  canonicalKey: string;
+  similarity: number;
+  confidence: number;
+}
+
 // In-memory caches (loaded once per server process)
 let degreesByKey: Map<string, CanonicalDegree> = new Map();
 let eligibilitiesByKey: Map<string, CanonicalEligibility> = new Map();
@@ -49,9 +62,29 @@ let eligibilitiesByKey: Map<string, CanonicalEligibility> = new Map();
 let degreeAliasIndex: Map<NormalizedKey, CanonicalDegree> = new Map();
 let eligibilityAliasIndex: Map<NormalizedKey, CanonicalEligibility> = new Map();
 
+// BGE-M3 canonical embeddings for degrees & eligibilities.
+let degreeEmbeddingsByKey: Map<string, Embedding> = new Map();
+let eligibilityEmbeddingsByKey: Map<string, Embedding> = new Map();
+
+// Track whether BGE canonical embeddings have been computed lazily
+let bgeCanonicalEmbeddingsLoaded = false;
+let bgeCanonicalEmbeddingsLoadingPromise: Promise<void> | null = null;
+
 // Ensure YAML only loaded once and shared
 let dictionariesLoaded = false;
 let dictionariesLoadingPromise: Promise<void> | null = null;
+
+// BGE-M3 similarity thresholds.
+// For JobSync, we prefer precision: better UNKNOWN than wrong mapping.
+const BGE_STRONG_THRESHOLD =
+  process.env.BGE_M3_STRONG_THRESHOLD !== undefined
+    ? Number(process.env.BGE_M3_STRONG_THRESHOLD)
+    : 0.83;
+
+const BGE_SOFT_THRESHOLD =
+  process.env.BGE_M3_SOFT_THRESHOLD !== undefined
+    ? Number(process.env.BGE_M3_SOFT_THRESHOLD)
+    : 0.75;
 
 /**
  * Normalize a string key for dictionary lookup:
@@ -105,16 +138,16 @@ function parseDegreesYaml(doc: any): CanonicalDegree[] {
   if (Array.isArray(source)) {
     for (const item of source) {
       if (!item) continue;
-      const key = item.key || item.id;
-      if (!key || !item.canonical) continue;
+      const key = (item as any).key || (item as any).id;
+      if (!key || !(item as any).canonical) continue;
 
       result.push({
         key: String(key),
-        canonical: String(item.canonical),
-        level: item.level,
-        fieldGroup: item.field_group || item.fieldGroup,
-        aliases: Array.isArray(item.aliases)
-          ? item.aliases.map((a: any) => String(a))
+        canonical: String((item as any).canonical),
+        level: (item as any).level,
+        fieldGroup: (item as any).field_group || (item as any).fieldGroup,
+        aliases: Array.isArray((item as any).aliases)
+          ? (item as any).aliases.map((a: any) => String(a))
           : [],
       });
     }
@@ -161,15 +194,15 @@ function parseEligibilitiesYaml(doc: any): CanonicalEligibility[] {
   if (Array.isArray(source)) {
     for (const item of source) {
       if (!item) continue;
-      const key = item.key || item.id;
-      if (!key || !item.canonical) continue;
+      const key = (item as any).key || (item as any).id;
+      if (!key || !(item as any).canonical) continue;
 
       result.push({
         key: String(key),
-        canonical: String(item.canonical),
-        category: item.category,
-        aliases: Array.isArray(item.aliases)
-          ? item.aliases.map((a: any) => String(a))
+        canonical: String((item as any).canonical),
+        category: (item as any).category,
+        aliases: Array.isArray((item as any).aliases)
+          ? (item as any).aliases.map((a: any) => String(a))
           : [],
       });
     }
@@ -200,6 +233,140 @@ function parseEligibilitiesYaml(doc: any): CanonicalEligibility[] {
   }
 
   return [];
+}
+
+/**
+ * BGE-M3 generic best-match finder.
+ */
+async function findBestBgeMatch(
+  raw: string,
+  embeddingsByKey: Map<string, Embedding>
+): Promise<BgeMatchResult | null> {
+  const text = raw.trim();
+  if (!text) return null;
+  if (!embeddingsByKey.size) return null;
+
+  const queryEmbedding = await getBgeEmbedding(text);
+  if (!queryEmbedding) return null;
+
+  let bestKey: string | null = null;
+  let bestSim = -1;
+
+  for (const [key, emb] of embeddingsByKey.entries()) {
+    const sim = cosineSimilarity(queryEmbedding, emb);
+    if (sim > bestSim) {
+      bestSim = sim;
+      bestKey = key;
+    }
+  }
+
+  if (!bestKey || bestSim <= 0) return null;
+
+  if (bestSim >= BGE_STRONG_THRESHOLD) {
+    return {
+      canonicalKey: bestKey,
+      similarity: bestSim,
+      confidence: 0.9,
+    };
+  }
+
+  if (bestSim >= BGE_SOFT_THRESHOLD) {
+    return {
+      canonicalKey: bestKey,
+      similarity: bestSim,
+      confidence: 0.7,
+    };
+  }
+
+  // Below soft threshold: let Gemini handle it instead.
+  return null;
+}
+
+/**
+ * Lazily precompute BGE-M3 canonical embeddings.
+ *
+ * This is only invoked when a dictionary lookup FAILS and we actually
+ * want to use BGE as a fallback. Pure YAML-only flows don't pay this cost.
+ */
+async function ensureBgeCanonicalEmbeddingsLoaded(): Promise<void> {
+  // Make sure dictionaries & alias maps are ready
+  await ensureDictionariesLoaded();
+
+  if (bgeCanonicalEmbeddingsLoaded) return;
+  if (bgeCanonicalEmbeddingsLoadingPromise) {
+    await bgeCanonicalEmbeddingsLoadingPromise;
+    return;
+  }
+
+  bgeCanonicalEmbeddingsLoadingPromise = (async () => {
+    try {
+      const degreesArray = Array.from(degreesByKey.values());
+      const eligArray = Array.from(eligibilitiesByKey.values());
+
+      degreeEmbeddingsByKey = new Map();
+      eligibilityEmbeddingsByKey = new Map();
+
+      if (degreesArray.length > 0) {
+        const degreeCanonicals = degreesArray.map((d) => d.canonical);
+        const degreeEmbeddings = await getBgeEmbeddingsBatch(degreeCanonicals);
+
+        for (let i = 0; i < degreesArray.length; i++) {
+          const emb = degreeEmbeddings[i];
+          if (emb) {
+            degreeEmbeddingsByKey.set(degreesArray[i].key, emb);
+          }
+        }
+
+        console.log(
+          '[JobSync] BGE-M3 degree canonical embeddings loaded lazily:',
+          degreeEmbeddingsByKey.size
+        );
+      }
+
+      if (eligArray.length > 0) {
+        const eligCanonicals = eligArray.map((e) => e.canonical);
+        const eligEmbeddings = await getBgeEmbeddingsBatch(eligCanonicals);
+
+        for (let i = 0; i < eligArray.length; i++) {
+          const emb = eligEmbeddings[i];
+          if (emb) {
+            eligibilityEmbeddingsByKey.set(eligArray[i].key, emb);
+          }
+        }
+
+        console.log(
+          '[JobSync] BGE-M3 eligibility canonical embeddings loaded lazily:',
+          eligibilityEmbeddingsByKey.size
+        );
+      }
+
+      bgeCanonicalEmbeddingsLoaded = true;
+    } catch (err) {
+      console.error(
+        '[JobSync] Failed to lazily precompute BGE-M3 canonical embeddings. Falling back to dictionaries + Gemini only.',
+        err
+      );
+      degreeEmbeddingsByKey.clear();
+      eligibilityEmbeddingsByKey.clear();
+      bgeCanonicalEmbeddingsLoaded = false;
+    } finally {
+      bgeCanonicalEmbeddingsLoadingPromise = null;
+    }
+  })();
+
+  await bgeCanonicalEmbeddingsLoadingPromise;
+}
+
+async function findBestDegreeByEmbedding(rawDegree: string): Promise<BgeMatchResult | null> {
+  await ensureBgeCanonicalEmbeddingsLoaded();
+  return findBestBgeMatch(rawDegree, degreeEmbeddingsByKey);
+}
+
+async function findBestEligibilityByEmbedding(
+  rawEligibility: string
+): Promise<BgeMatchResult | null> {
+  await ensureBgeCanonicalEmbeddingsLoaded();
+  return findBestBgeMatch(rawEligibility, eligibilityEmbeddingsByKey);
 }
 
 /**
@@ -295,6 +462,10 @@ async function ensureDictionariesLoaded(): Promise<void> {
     eligibilitiesByKey = new Map();
     degreeAliasIndex = new Map();
     eligibilityAliasIndex = new Map();
+    degreeEmbeddingsByKey = new Map();
+    eligibilityEmbeddingsByKey = new Map();
+    bgeCanonicalEmbeddingsLoaded = false;
+    bgeCanonicalEmbeddingsLoadingPromise = null;
 
     // Build degree maps (if any)
     for (const d of degreesList) {
@@ -302,7 +473,7 @@ async function ensureDictionariesLoaded(): Promise<void> {
 
       const allStrings = new Set<string>();
       allStrings.add(d.canonical);
-      d.aliases.forEach(a => allStrings.add(a));
+      d.aliases.forEach((a) => allStrings.add(a));
 
       for (const s of allStrings) {
         const nk = normalizeKey(s);
@@ -320,7 +491,7 @@ async function ensureDictionariesLoaded(): Promise<void> {
 
       const allStrings = new Set<string>();
       allStrings.add(e.canonical);
-      e.aliases.forEach(a => allStrings.add(a));
+      e.aliases.forEach((a) => allStrings.add(a));
 
       for (const s of allStrings) {
         const nk = normalizeKey(s);
@@ -330,8 +501,6 @@ async function ensureDictionariesLoaded(): Promise<void> {
         eligibilityAliasIndex.set(nk, e);
       }
     }
-
-    dictionariesLoaded = true;
 
     // 🔍 Extra debug: check the exact alias you care about
     const debugAlias1 = normalizeKey('Career Service Professional');
@@ -351,6 +520,8 @@ async function ensureDictionariesLoaded(): Promise<void> {
       has3: eligibilityAliasIndex.has(debugAlias3),
       value3: eligibilityAliasIndex.get(debugAlias3)?.key ?? null,
     });
+
+    dictionariesLoaded = true;
   })();
 
   await dictionariesLoadingPromise;
@@ -422,7 +593,7 @@ function getTopDegreeCandidates(raw: string, limit: number): CanonicalDegree[] {
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map(s => s.degree);
+  return scored.slice(0, limit).map((s) => s.degree);
 }
 
 /**
@@ -440,7 +611,7 @@ function getTopEligibilityCandidates(raw: string, limit: number): CanonicalEligi
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map(s => s.eligibility);
+  return scored.slice(0, limit).map((s) => s.eligibility);
 }
 
 /**
@@ -450,7 +621,7 @@ function buildDegreeClassificationPrompt(
   rawDegree: string,
   candidates: CanonicalDegree[]
 ): string {
-  const options = candidates.map(c => ({
+  const options = candidates.map((c) => ({
     key: c.key,
     canonical: c.canonical,
     level: c.level ?? null,
@@ -489,7 +660,7 @@ function buildEligibilityClassificationPrompt(
   rawEligibility: string,
   candidates: CanonicalEligibility[]
 ): string {
-  const options = candidates.map(c => ({
+  const options = candidates.map((c) => ({
     key: c.key,
     canonical: c.canonical,
     category: c.category ?? null,
@@ -523,9 +694,12 @@ Respond ONLY in this exact JSON format:
 /**
  * Normalize a degree string using:
  * 1. Fast dictionary/alias check
- * 2. Gemini classifier (if no dictionary hit)
+ * 2. BGE-M3 embedding fallback (if no dictionary hit)
+ * 3. Gemini classifier (if embedding fallback misses or disabled)
  */
-export async function normalizeDegreeValue(rawDegree: string): Promise<NormalizationResult> {
+export async function normalizeDegreeValue(
+  rawDegree: string
+): Promise<NormalizationResult> {
   await ensureDictionariesLoaded();
 
   if (!rawDegree || !rawDegree.trim()) {
@@ -548,7 +722,22 @@ export async function normalizeDegreeValue(rawDegree: string): Promise<Normaliza
     };
   }
 
-  // 2) Gemini classifier fallback
+  // 2) BGE-M3 embedding fallback
+  try {
+    const bgeHit = await findBestDegreeByEmbedding(rawDegree);
+    if (bgeHit) {
+      return {
+        canonicalKey: bgeHit.canonicalKey,
+        method: 'embedding',
+        confidence: bgeHit.confidence,
+        raw: rawDegree,
+      };
+    }
+  } catch (err) {
+    console.error('[JobSync] BGE-M3 degree normalization failed, skipping to Gemini:', err);
+  }
+
+  // 3) Gemini classifier fallback
   const candidates = getTopDegreeCandidates(rawDegree, 20);
   if (!candidates.length) {
     return {
@@ -607,9 +796,12 @@ export async function normalizeDegreeValue(rawDegree: string): Promise<Normaliza
 /**
  * Normalize an eligibility string using:
  * 1. Fast dictionary/alias check
- * 2. Gemini classifier (if no dictionary hit)
+ * 2. BGE-M3 embedding fallback (if no dictionary hit)
+ * 3. Gemini classifier (if embedding fallback misses or disabled)
  */
-export async function normalizeEligibilityValue(rawEligibility: string): Promise<NormalizationResult> {
+export async function normalizeEligibilityValue(
+  rawEligibility: string
+): Promise<NormalizationResult> {
   await ensureDictionariesLoaded();
 
   if (!rawEligibility || !rawEligibility.trim()) {
@@ -632,7 +824,25 @@ export async function normalizeEligibilityValue(rawEligibility: string): Promise
     };
   }
 
-  // 2) Gemini classifier fallback
+  // 2) BGE-M3 embedding fallback
+  try {
+    const bgeHit = await findBestEligibilityByEmbedding(rawEligibility);
+    if (bgeHit) {
+      return {
+        canonicalKey: bgeHit.canonicalKey,
+        method: 'embedding',
+        confidence: bgeHit.confidence,
+        raw: rawEligibility,
+      };
+    }
+  } catch (err) {
+    console.error(
+      '[JobSync] BGE-M3 eligibility normalization failed, skipping to Gemini:',
+      err
+    );
+  }
+
+  // 3) Gemini classifier fallback
   const candidates = getTopEligibilityCandidates(rawEligibility, 20);
   if (!candidates.length) {
     return {
@@ -714,7 +924,7 @@ async function normalizeCompositeEligibilityLine(rawLine: string): Promise<strin
   const tokens = trimmed
     .replace(/\s+(or|and)\s+/gi, ',')
     .split(',')
-    .map(part => part.trim())
+    .map((part) => part.trim())
     .filter(Boolean);
 
   if (!tokens.length) {
@@ -806,7 +1016,7 @@ async function normalizeCompositeDegreeString(
   const rawTokens = trimmed
     .replace(/\s+(or|and)\s+/gi, ',')
     .split(',')
-    .map(part => part.trim())
+    .map((part) => part.trim())
     .filter(Boolean);
 
   if (!rawTokens.length) {
@@ -869,14 +1079,6 @@ export async function normalizeJobAndApplicant(
   await ensureDictionariesLoaded();
 
   // 🔹 Degrees (job + applicant)
-  //
-  // New behavior:
-  // - If the string is simple (no "and"/"or"/","), we normalize it as a single degree.
-  // - If it is composite, we split into tokens, normalize each token, then
-  //   reconstruct a canonical string that still contains "and"/"or".
-  //   This allows matchDegreeRequirement() in scoringAlgorithms.ts to
-  //   correctly apply SINGLE / AND / OR semantics, while still benefiting
-  //   from YAML+Gemini canonicalization.
   const {
     canonicalText: jobDegreeCanonical,
     primaryEntry: jobDegreeEntry,
@@ -890,11 +1092,6 @@ export async function normalizeJobAndApplicant(
   );
 
   // 🔹 Job eligibilities (string array)
-  //
-  // Updated behavior:
-  // - SIMPLE lines (no AND/OR/commas) → canonicalized via YAML dictionary
-  // - COMPOSITE lines (with "and"/"or"/commas) → each token is canonicalized
-  //   but AND/OR semantics are preserved in the reconstructed line.
   const normalizedJobEligibilities: string[] = await Promise.all(
     (job.eligibilities || []).map(async (line) => {
       if (!line) return line;
@@ -922,7 +1119,7 @@ export async function normalizeJobAndApplicant(
         }
       }
 
-      // Simple single eligibility → dictionary normalization
+      // Simple single eligibility → dictionary/embedding/Gemini normalization
       try {
         const result = await normalizeEligibilityValue(trimmed);
         const canonical =
@@ -940,9 +1137,8 @@ export async function normalizeJobAndApplicant(
       }
     })
   );
-  
 
-  // 🔹 Applicant eligibilities (unchanged, still canonicalized)
+  // 🔹 Applicant eligibilities
   const normalizedApplicantEligibilities = await Promise.all(
     (applicant.eligibilities || []).map(async (e) => {
       const result = await normalizeEligibilityValue(e.eligibilityTitle);
@@ -963,7 +1159,7 @@ export async function normalizeJobAndApplicant(
     degreeRequirement: jobDegreeCanonical,
     eligibilities: normalizedJobEligibilities,
 
-    // NEW: attach metadata if available
+    // Attach metadata if available
     degreeLevel: jobDegreeEntry?.level?.toLowerCase().trim(),
     degreeFieldGroup: jobDegreeEntry?.fieldGroup, // already normalized from YAML
   };
@@ -973,7 +1169,7 @@ export async function normalizeJobAndApplicant(
     highestEducationalAttainment: applicantDegreeCanonical,
     eligibilities: normalizedApplicantEligibilities,
 
-    // NEW: attach metadata if available
+    // Attach metadata if available
     degreeLevel: applicantDegreeEntry?.level?.toLowerCase().trim(),
     degreeFieldGroup: applicantDegreeEntry?.fieldGroup,
   };

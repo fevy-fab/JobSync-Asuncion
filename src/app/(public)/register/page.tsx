@@ -181,7 +181,7 @@ export default function RegisterPage() {
                 <div className="w-6 h-6 bg-[#22A555] rounded-full flex items-center justify-center">
                   <span className="text-white text-xs">✓</span>
                 </div>
-                <span className="text-sm text-gray-700">AI-powered job matching</span>
+                <span className="text-sm text-gray-700">AI-assisted job matching</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 bg-[#22A555] rounded-full flex items-center justify-center">

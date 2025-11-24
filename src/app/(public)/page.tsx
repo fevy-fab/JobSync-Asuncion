@@ -97,9 +97,9 @@ export default function Home() {
                   <div className="w-14 h-14 bg-white/20 rounded-lg inline-flex items-center justify-center mb-4">
                     <Sparkles className="w-7 h-7 text-white" />
                   </div>
-                  <h3 className="text-xl font-bold mb-2">AI-Powered Matching</h3>
+                  <h3 className="text-xl font-bold mb-2">AI-assisted Matching</h3>
                   <p className="text-white/80 text-sm">
-                    Gemini AI analyzes your profile to match you with the right opportunities
+                    AI analyzes your profile to match you with the right opportunities
                   </p>
                 </div>
               </div>
@@ -107,7 +107,7 @@ export default function Home() {
               {/* Stats */}
               <div className="grid grid-cols-3 gap-6">
                 <div>
-                  <div className="text-4xl font-bold mb-1">Gemini AI</div>
+                  <div className="text-4xl font-bold mb-1">AI-assisted</div>
                   <div className="text-sm text-white/80">Powered Matching</div>
                 </div>
                 <div>
@@ -146,9 +146,9 @@ export default function Home() {
                 <div className="w-20 h-20 bg-gradient-to-br from-[#22A555] to-[#1A7F3E] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg">
                   <Target className="w-10 h-10 text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">Gemini AI-Powered Matching</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">AI-assisted Matching</h3>
                 <p className="text-gray-600">
-                  Our Gemini AI algorithms analyze your PDS and match you with the most suitable positions
+                  Our AI-assisted algorithms analyze your PDS and match you with the most suitable positions
                 </p>
               </div>
             </Card>
@@ -238,9 +238,9 @@ export default function Home() {
               <div className="w-24 h-24 bg-[#22A555] rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
                 <span className="text-white text-4xl font-bold">1</span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">Create Profile</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">Create PDS</h3>
               <p className="text-gray-600">
-                Upload your Personal Data Sheet (PDS 2025 format) and select your desired position
+                Fill out your Personal Data Sheet (PDS) on the site and select your desired position
               </p>
             </div>
 
@@ -248,9 +248,9 @@ export default function Home() {
               <div className="w-24 h-24 bg-[#20C997] rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl">
                 <span className="text-white text-4xl font-bold">2</span>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">AI Analysis</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">Analysis</h3>
               <p className="text-gray-600">
-                Our Gemini AI system analyzes your qualifications and ranks you against job requirements
+                Our AI-assisted system analyzes your qualifications and ranks you against job requirements
               </p>
             </div>
 
@@ -283,8 +283,8 @@ export default function Home() {
             <Card className="p-10">
               <div className="prose prose-lg max-w-none">
                 <p className="text-gray-700 leading-relaxed mb-6">
-                  JobSync is an innovative Gemini AI-powered system designed specifically for the Asuncion Municipal Hall
-                  to streamline the recruitment process. Our platform uses cutting-edge Gemini AI technology
+                  JobSync is an innovative AI-assisted system designed specifically for the Asuncion Municipal Hall
+                  to streamline the recruitment process. Our platform uses cutting-edge AI technology
                   and Optical Character Recognition to match qualified candidates with job opportunities.
                 </p>
                 <p className="text-gray-700 leading-relaxed mb-6">

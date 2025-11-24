@@ -1513,7 +1513,7 @@ export default function RankedRecordsPage() {
                   <div>
                     <p className="font-semibold text-blue-800 mb-1">Ranking Process</p>
                     <p className="text-sm text-blue-700">
-                      Gemini + Advanced Scoring Algorithms will analyze and rank all pending applicants.
+                      AI-assisted Scoring Algorithms will analyze and rank all pending applicants.
                     </p>
                   </div>
                 </div>

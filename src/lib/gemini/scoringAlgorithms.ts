@@ -50,6 +50,24 @@ export interface ScoreBreakdown {
   matchedEligibilitiesCount: number; // Number of job eligibilities matched by applicant
 }
 
+function isNoRequirementText(raw?: string | null): boolean {
+  if (raw === undefined || raw === null) return true;
+
+  const lower = raw.toLowerCase().trim();
+  if (!lower) return true; // empty string
+
+  // Exact “no requirement” forms we want to treat as neutral
+  if (lower === 'none') return true;
+  if (lower === 'not required') return true;
+  if (lower === 'no degree required') return true;
+  if (lower === 'no eligibility required') return true;
+  if (lower === 'no eligibilities required') return true;
+  if (lower === 'no skills required') return true;
+  if (lower === 'no specific skills required') return true;
+
+  return false;
+}
+
 /**
  * Helper function to normalize skill strings into tokens
  * Removes punctuation, splits by whitespace, filters short/common words
@@ -544,10 +562,7 @@ function computeEligibilityMatch(
 
   if (
     jobLines.length === 0 ||
-    jobLines.some(e => {
-      const lower = e.toLowerCase();
-      return lower.includes('none') || lower.includes('not required');
-    })
+    jobLines.some(e => isNoRequirementText(e))
   ) {
     return {
       score: 50,
@@ -663,7 +678,22 @@ async function calculateSkillMatch(
     if (!key) continue;
     if (!jobMap.has(key)) jobMap.set(key, s);
   }
-  const uniqueJobSkills = Array.from(jobMap.values());
+
+  // Start from unique job skills
+  let uniqueJobSkills = Array.from(jobMap.values());
+
+  // Treat explicit textual “no skill requirement” as NO requirements → neutral 50
+  uniqueJobSkills = uniqueJobSkills.filter(s => {
+    const lower = s.toLowerCase().trim();
+    if (!lower) return false;
+
+    if (lower === 'none') return false;
+    if (lower === 'not required') return false;
+    if (lower === 'no skills required') return false;
+    if (lower === 'no specific skills required') return false;
+
+    return true;
+  });
 
   const applicantMap = new Map<string, string>();
   for (const s of applicantSkills) {
@@ -816,489 +846,496 @@ export async function algorithm1_WeightedSum(
   applicant: ApplicantData
 ): Promise<ScoreBreakdown> {
   // Education Score
-  const jobDegreeRaw = job.degreeRequirement;
-  const applicantDegreeRaw = applicant.highestEducationalAttainment;
+  const jobDegreeRaw = job.degreeRequirement || '';
+  const applicantDegreeRaw = applicant.highestEducationalAttainment || '';
 
-  const jobDegree = jobDegreeRaw.toLowerCase().trim();
-  const applicantDegree = applicantDegreeRaw.toLowerCase().trim();
+  let educationScore: number;
 
-  let educationScore = matchDegreeRequirement(jobDegree, applicantDegree);
-
-  const andInfo = evaluateDegreeAndGate(jobDegreeRaw, applicantDegreeRaw);
-
-  if (andInfo.isAnd && !andInfo.allHit) {
-    const originalScore = educationScore;
-    educationScore = 0;
-
-    console.log('🔍 [Algorithm 1] Degree AND gate NOT satisfied, forcing educationScore to 0', {
-      jobDegreeRaw,
-      applicantDegreeRaw,
-      hits: andInfo.hits,
-      required: andInfo.required,
-      originalScore,
-    });
+  if (isNoRequirementText(jobDegreeRaw)) {
+    // No degree requirement – neutral score so education doesn't unfairly penalize or boost
+    educationScore = 50;
   } else {
-    const relatedFields: Record<string, string[]> = {
-      // ----------------------------
-      // IT / IS / CS / E-Gov
-      // ----------------------------
-      'information technology': [
-        'computer science',
-        'software engineering',
-        'information systems',
-        'information system',
-        'information management',
-        'information and communications technology',
-        'information communication technology',
-        'information and communication technology',
-        'computer engineering',
-        'informatics',
-        'management information systems',
-        'government information systems',
-        'e-governance',
-        'e-government',
-      ],
-      'information systems': [
-        'information technology',
-        'computer science',
-        'software engineering',
-        'management information systems',
-        'information management',
-        'information and communications technology',
-        'computer engineering',
-        'informatics',
-      ],
-      'computer science': [
-        'information technology',
-        'software engineering',
-        'computer engineering',
-        'information systems',
-        'informatics',
-        'information and communications technology',
-      ],
-      'computer engineering': [
-        'computer science',
-        'information technology',
-        'electronics engineering',
-        'software engineering',
-        'information systems',
-      ],
-      'software engineering': [
-        'computer science',
-        'information technology',
-        'information systems',
-        'computer engineering',
-      ],
-      'informatics': [
-        'information technology',
-        'computer science',
-        'information systems',
-        'data science',
-      ],
+    const jobDegree = jobDegreeRaw.toLowerCase().trim();
+    const applicantDegree = applicantDegreeRaw.toLowerCase().trim();
 
-      // ----------------------------
-      // Engineering / Planning / Built Environment
-      // ----------------------------
-      'civil engineering': [
-        'architecture',
-        'structural engineering',
-        'construction management',
-        'construction engineering',
-        'sanitary engineering',
-        'environmental engineering',
-        'transportation engineering',
-        'highway engineering',
-        'water resources engineering',
-      ],
-      'architecture': [
-        'civil engineering',
-        'construction management',
-        'environmental planning',
-        'urban planning',
-        'urban and regional planning',
-        'landscape architecture',
-        'building technology',
-      ],
-      'environmental planning': [
-        'urban planning',
-        'urban and regional planning',
-        'regional planning',
-        'architecture',
-        'civil engineering',
-        'environmental management',
-        'environmental science',
-      ],
+    educationScore = matchDegreeRequirement(jobDegree, applicantDegree);
 
-      // ----------------------------
-      // Health / Nursing / Public Health
-      // ----------------------------
-      'nursing': [
-        'midwifery',
-        'health sciences',
-        'medical technology',
-        'medical laboratory science',
-        'public health',
-        'community health',
-        'allied health sciences',
-      ],
-      'midwifery': [
-        'nursing',
-        'health sciences',
-        'public health',
-        'community health',
-      ],
-      'public health': [
-        'nursing',
-        'community health',
-        'health sciences',
-        'medical technology',
-      ],
+    const andInfo = evaluateDegreeAndGate(jobDegreeRaw, applicantDegreeRaw);
 
-      // ----------------------------
-      // Accounting / Finance / Public Finance / Treasury
-      // ----------------------------
-      'accounting': [
-        'accountancy',
-        'finance',
-        'financial management',
-        'business administration',
-        'accounting technology',
-        'management accounting',
-        'banking and finance',
-        'public finance',
-        'public financial management',
-        'fiscal administration',
-        'local fiscal administration',
-        'treasury management',
-        'budget management',
-        'public budgeting',
-        'internal auditing',
-        'audit and internal control',
-      ],
-      'accountancy': [
-        'accounting',
-        'financial management',
-        'finance',
-        'management accounting',
-        'public finance',
-        'public financial management',
-      ],
-      'financial management': [
-        'accounting',
-        'accountancy',
-        'business administration',
-        'banking and finance',
-        'economics',
-        'public finance',
-      ],
-      'public finance': [
-        'accounting',
-        'accountancy',
-        'financial management',
-        'fiscal administration',
-        'public financial management',
-        'treasury management',
-        'budget management',
-      ],
-      'fiscal administration': [
-        'public finance',
-        'public administration',
-        'accounting',
-        'accountancy',
-        'public budgeting',
-      ],
+    if (andInfo.isAnd && !andInfo.allHit) {
+      const originalScore = educationScore;
+      educationScore = 0;
 
-      // ----------------------------
-      // Business / Office / HR / Commerce
-      // ----------------------------
-      'business administration': [
-        'management',
-        'organizational development',
-        'commerce',
-        'entrepreneurship',
-        'marketing management',
-        'financial management',
-        'human resource management',
-        'office administration',
-        'public administration',
-        'management accounting',
-        'business management',
-        'operations management',
-        'supply chain management',
-      ],
-      'commerce': [
-        'business administration',
-        'accounting',
-        'financial management',
-        'marketing management',
-      ],
-      'office administration': [
-        'public administration',
-        'business administration',
-        'secretarial',
-        'office management',
-        'management',
-        'executive assistant',
-        'records management',
-        'administrative management',
-      ],
-      'public administration': [
-        'office administration',
-        'business administration',
-        'political science',
-        'public management',
-        'public governance',
-        'local government administration',
-        'local governance',
-        'public affairs',
-        'development studies',
-        'community development',
-        'fiscal administration',
-        'public policy',
-      ],
-      'public management': [
-        'public administration',
-        'public governance',
-        'public affairs',
-        'local governance',
-        'development management',
-      ],
-      'public governance': [
-        'public administration',
-        'public management',
-        'local governance',
-        'political science',
-      ],
-      'human resource management': [
-        'human resources management',
-        'business administration',
-        'psychology',
-        'industrial psychology',
-        'organizational development',
-      ],
+      console.log('🔍 [Algorithm 1] Degree AND gate NOT satisfied, forcing educationScore to 0', {
+        jobDegreeRaw,
+        applicantDegreeRaw,
+        hits: andInfo.hits,
+        required: andInfo.required,
+        originalScore,
+      });
+    } else {
+      const relatedFields: Record<string, string[]> = {
+        // ----------------------------
+        // IT / IS / CS / E-Gov
+        // ----------------------------
+        'information technology': [
+          'computer science',
+          'software engineering',
+          'information systems',
+          'information system',
+          'information management',
+          'information and communications technology',
+          'information communication technology',
+          'information and communication technology',
+          'computer engineering',
+          'informatics',
+          'management information systems',
+          'government information systems',
+          'e-governance',
+          'e-government',
+        ],
+        'information systems': [
+          'information technology',
+          'computer science',
+          'software engineering',
+          'management information systems',
+          'information management',
+          'information and communications technology',
+          'computer engineering',
+          'informatics',
+        ],
+        'computer science': [
+          'information technology',
+          'software engineering',
+          'computer engineering',
+          'information systems',
+          'informatics',
+          'information and communications technology',
+        ],
+        'computer engineering': [
+          'computer science',
+          'information technology',
+          'electronics engineering',
+          'software engineering',
+          'information systems',
+        ],
+        'software engineering': [
+          'computer science',
+          'information technology',
+          'information systems',
+          'computer engineering',
+        ],
+        'informatics': [
+          'information technology',
+          'computer science',
+          'information systems',
+          'data science',
+        ],
 
-      // ----------------------------
-      // Local Governance / Dev / Community
-      // ----------------------------
-      'local government administration': [
-        'public administration',
-        'local governance',
-        'public management',
-        'public governance',
-        'community development',
-        'development management',
-      ],
-      'local governance': [
-        'public administration',
-        'local government administration',
-        'public governance',
-        'community development',
-        'development management',
-      ],
-      'community development': [
-        'social work',
-        'public administration',
-        'local governance',
-        'development studies',
-        'rural development',
-        'community organizing',
-      ],
-      'development studies': [
-        'public administration',
-        'community development',
-        'rural development',
-        'development management',
-        'political science',
-      ],
+        // ----------------------------
+        // Engineering / Planning / Built Environment
+        // ----------------------------
+        'civil engineering': [
+          'architecture',
+          'structural engineering',
+          'construction management',
+          'construction engineering',
+          'sanitary engineering',
+          'environmental engineering',
+          'transportation engineering',
+          'highway engineering',
+          'water resources engineering',
+        ],
+        'architecture': [
+          'civil engineering',
+          'construction management',
+          'environmental planning',
+          'urban planning',
+          'urban and regional planning',
+          'landscape architecture',
+          'building technology',
+        ],
+        'environmental planning': [
+          'urban planning',
+          'urban and regional planning',
+          'regional planning',
+          'architecture',
+          'civil engineering',
+          'environmental management',
+          'environmental science',
+        ],
 
-      // ----------------------------
-      // Social Welfare / Social Work / Psych
-      // ----------------------------
-      'social work': [
-        'social welfare',
-        'community development',
-        'psychology',
-        'sociology',
-        'guidance and counseling',
-        'human services',
-      ],
-      'social welfare': [
-        'social work',
-        'community development',
-        'public administration',
-        'development studies',
-      ],
-      'psychology': [
-        'industrial psychology',
-        'organizational psychology',
-        'human resource management',
-        'guidance and counseling',
-        'social work',
-      ],
+        // ----------------------------
+        // Health / Nursing / Public Health
+        // ----------------------------
+        'nursing': [
+          'midwifery',
+          'health sciences',
+          'medical technology',
+          'medical laboratory science',
+          'public health',
+          'community health',
+          'allied health sciences',
+        ],
+        'midwifery': [
+          'nursing',
+          'health sciences',
+          'public health',
+          'community health',
+        ],
+        'public health': [
+          'nursing',
+          'community health',
+          'health sciences',
+          'medical technology',
+        ],
 
-      // ----------------------------
-      // DRRM / Safety / Peace & Order
-      // ----------------------------
-      'disaster risk reduction and management': [
-        'disaster risk reduction management',
-        'disaster management',
-        'emergency management',
-        'emergency and disaster management',
-        'civil defense',
-        'public safety administration',
-        'public safety management',
-        'environmental management',
-        'community development',
-      ],
-      'disaster management': [
-        'disaster risk reduction and management',
-        'emergency management',
-        'civil defense',
-        'public safety administration',
-      ],
-      'public safety administration': [
-        'public safety management',
-        'criminology',
-        'industrial security management',
-        'disaster risk reduction and management',
-        'police administration',
-      ],
-      'criminology': [
-        'criminal justice',
-        'public safety administration',
-        'industrial security management',
-        'forensic science',
-      ],
+        // ----------------------------
+        // Accounting / Finance / Public Finance / Treasury
+        // ----------------------------
+        'accounting': [
+          'accountancy',
+          'finance',
+          'financial management',
+          'business administration',
+          'accounting technology',
+          'management accounting',
+          'banking and finance',
+          'public finance',
+          'public financial management',
+          'fiscal administration',
+          'local fiscal administration',
+          'treasury management',
+          'budget management',
+          'public budgeting',
+          'internal auditing',
+          'audit and internal control',
+        ],
+        'accountancy': [
+          'accounting',
+          'financial management',
+          'finance',
+          'management accounting',
+          'public finance',
+          'public financial management',
+        ],
+        'financial management': [
+          'accounting',
+          'accountancy',
+          'business administration',
+          'banking and finance',
+          'economics',
+          'public finance',
+        ],
+        'public finance': [
+          'accounting',
+          'accountancy',
+          'financial management',
+          'fiscal administration',
+          'public financial management',
+          'treasury management',
+          'budget management',
+        ],
+        'fiscal administration': [
+          'public finance',
+          'public administration',
+          'accounting',
+          'accountancy',
+          'public budgeting',
+        ],
 
-      // ----------------------------
-      // Agriculture / Agribusiness / Environment
-      // ----------------------------
-      'agriculture': [
-        'agribusiness',
-        'agricultural engineering',
-        'agricultural and biosystems engineering',
-        'agricultural economics',
-        'animal science',
-        'crop science',
-        'rural development',
-        'veterinary medicine',
-      ],
-      'agribusiness': [
-        'agriculture',
-        'business administration',
-        'commerce',
-        'agricultural economics',
-      ],
-      'environmental science': [
-        'environmental management',
-        'environmental engineering',
-        'environmental planning',
-        'natural resources management',
-        'forestry',
-        'marine biology',
-        'biology',
-      ],
+        // ----------------------------
+        // Business / Office / HR / Commerce
+        // ----------------------------
+        'business administration': [
+          'management',
+          'organizational development',
+          'commerce',
+          'entrepreneurship',
+          'marketing management',
+          'financial management',
+          'human resource management',
+          'office administration',
+          'public administration',
+          'management accounting',
+          'business management',
+          'operations management',
+          'supply chain management',
+        ],
+        'commerce': [
+          'business administration',
+          'accounting',
+          'financial management',
+          'marketing management',
+        ],
+        'office administration': [
+          'public administration',
+          'business administration',
+          'secretarial',
+          'office management',
+          'management',
+          'executive assistant',
+          'records management',
+          'administrative management',
+        ],
+        'public administration': [
+          'office administration',
+          'business administration',
+          'political science',
+          'public management',
+          'public governance',
+          'local government administration',
+          'local governance',
+          'public affairs',
+          'development studies',
+          'community development',
+          'fiscal administration',
+          'public policy',
+        ],
+        'public management': [
+          'public administration',
+          'public governance',
+          'public affairs',
+          'local governance',
+          'development management',
+        ],
+        'public governance': [
+          'public administration',
+          'public management',
+          'local governance',
+          'political science',
+        ],
+        'human resource management': [
+          'human resources management',
+          'business administration',
+          'psychology',
+          'industrial psychology',
+          'organizational development',
+        ],
 
-      // ----------------------------
-      // Education (for DepEd / LGU school-based posts)
-      // ----------------------------
-      'elementary education': [
-        'early childhood education',
-        'primary education',
-        'basic education',
-      ],
-      'secondary education': [
-        'social studies education',
-        'mathematics education',
-        'science education',
-        'english education',
-        'mapeh education',
-      ],
-      'social studies education': [
-        'secondary education major in social studies',
-        'history',
-        'political science',
-        'community development',
-      ],
+        // ----------------------------
+        // Local Governance / Dev / Community
+        // ----------------------------
+        'local government administration': [
+          'public administration',
+          'local governance',
+          'public management',
+          'public governance',
+          'community development',
+          'development management',
+        ],
+        'local governance': [
+          'public administration',
+          'local government administration',
+          'public governance',
+          'community development',
+          'development management',
+        ],
+        'community development': [
+          'social work',
+          'public administration',
+          'local governance',
+          'development studies',
+          'rural development',
+          'community organizing',
+        ],
+        'development studies': [
+          'public administration',
+          'community development',
+          'rural development',
+          'development management',
+          'political science',
+        ],
 
-      // ----------------------------
-      // Records / Library / Info Services
-      // ----------------------------
-      'library and information science': [
-        'library science',
-        'information studies',
-        'archives and records management',
-        'records management',
-        'records administration',
-      ],
-      'records management': [
-        'archives and records management',
-        'records and archives management',
-        'office administration',
-        'library and information science',
-        'information management',
-      ],
+        // ----------------------------
+        // Social Welfare / Social Work / Psych
+        // ----------------------------
+        'social work': [
+          'social welfare',
+          'community development',
+          'psychology',
+          'sociology',
+          'guidance and counseling',
+          'human services',
+        ],
+        'social welfare': [
+          'social work',
+          'community development',
+          'public administration',
+          'development studies',
+        ],
+        'psychology': [
+          'industrial psychology',
+          'organizational psychology',
+          'human resource management',
+          'guidance and counseling',
+          'social work',
+        ],
 
-      // ----------------------------
-      // Hospitality / Tourism (for LGU-run facilities / tourism office)
-      // ----------------------------
-      'hospitality management': [
-        'hotel and restaurant management',
-        'hotel management',
-        'tourism management',
-        'culinary arts',
-        'events management',
-      ],
-      'tourism management': [
-        'tourism',
-        'hospitality management',
-        'hotel and restaurant management',
-        'travel management',
-        'events management',
-        'development communication',
-      ],
+        // ----------------------------
+        // DRRM / Safety / Peace & Order
+        // ----------------------------
+        'disaster risk reduction and management': [
+          'disaster risk reduction management',
+          'disaster management',
+          'emergency management',
+          'emergency and disaster management',
+          'civil defense',
+          'public safety administration',
+          'public safety management',
+          'environmental management',
+          'community development',
+        ],
+        'disaster management': [
+          'disaster risk reduction and management',
+          'emergency management',
+          'civil defense',
+          'public safety administration',
+        ],
+        'public safety administration': [
+          'public safety management',
+          'criminology',
+          'industrial security management',
+          'disaster risk reduction and management',
+          'police administration',
+        ],
+        'criminology': [
+          'criminal justice',
+          'public safety administration',
+          'industrial security management',
+          'forensic science',
+        ],
 
-      // ----------------------------
-      // Communication / DevComm (LGU information / PIO)
-      // ----------------------------
-      'communication': [
-        'mass communication',
-        'development communication',
-        'journalism',
-        'public relations',
-        'marketing communication',
-        'media studies',
-      ],
-      'development communication': [
-        'communication',
-        'mass communication',
-        'journalism',
-        'public relations',
-        'community development',
-        'social work',
-      ],
-    };
+        // ----------------------------
+        // Agriculture / Agribusiness / Environment
+        // ----------------------------
+        'agriculture': [
+          'agribusiness',
+          'agricultural engineering',
+          'agricultural and biosystems engineering',
+          'agricultural economics',
+          'animal science',
+          'crop science',
+          'rural development',
+          'veterinary medicine',
+        ],
+        'agribusiness': [
+          'agriculture',
+          'business administration',
+          'commerce',
+          'agricultural economics',
+        ],
+        'environmental science': [
+          'environmental management',
+          'environmental engineering',
+          'environmental planning',
+          'natural resources management',
+          'forestry',
+          'marine biology',
+          'biology',
+        ],
 
-    for (const [field, related] of Object.entries(relatedFields)) {
-      if (jobDegree.includes(field)) {
-        for (const relatedField of related) {
-          if (applicantDegree.includes(relatedField)) {
-            educationScore = Math.max(educationScore, 85);
-            break;
+        // ----------------------------
+        // Education (for DepEd / LGU school-based posts)
+        // ----------------------------
+        'elementary education': [
+          'early childhood education',
+          'primary education',
+          'basic education',
+        ],
+        'secondary education': [
+          'social studies education',
+          'mathematics education',
+          'science education',
+          'english education',
+          'mapeh education',
+        ],
+        'social studies education': [
+          'secondary education major in social studies',
+          'history',
+          'political science',
+          'community development',
+        ],
+
+        // ----------------------------
+        // Records / Library / Info Services
+        // ----------------------------
+        'library and information science': [
+          'library science',
+          'information studies',
+          'archives and records management',
+          'records management',
+          'records administration',
+        ],
+        'records management': [
+          'archives and records management',
+          'records and archives management',
+          'office administration',
+          'library and information science',
+          'information management',
+        ],
+
+        // ----------------------------
+        // Hospitality / Tourism (for LGU-run facilities / tourism office)
+        // ----------------------------
+        'hospitality management': [
+          'hotel and restaurant management',
+          'hotel management',
+          'tourism management',
+          'culinary arts',
+          'events management',
+        ],
+        'tourism management': [
+          'tourism',
+          'hospitality management',
+          'hotel and restaurant management',
+          'travel management',
+          'events management',
+          'development communication',
+        ],
+
+        // ----------------------------
+        // Communication / DevComm (LGU information / PIO)
+        // ----------------------------
+        'communication': [
+          'mass communication',
+          'development communication',
+          'journalism',
+          'public relations',
+          'marketing communication',
+          'media studies',
+        ],
+        'development communication': [
+          'communication',
+          'mass communication',
+          'journalism',
+          'public relations',
+          'community development',
+          'social work',
+        ],
+      };
+
+      for (const [field, related] of Object.entries(relatedFields)) {
+        if (jobDegree.includes(field)) {
+          for (const relatedField of related) {
+            if (applicantDegree.includes(relatedField)) {
+              educationScore = Math.max(educationScore, 85);
+              break;
+            }
           }
         }
       }
-    }
 
-    educationScore = adjustEducationForLevelAndField(
-      educationScore,
-      job.degreeRequirement,
-      applicant.highestEducationalAttainment,
-      job.degreeLevel,
-      applicant.degreeLevel,
-      job.degreeFieldGroup,
-      applicant.degreeFieldGroup
-    );
+      educationScore = adjustEducationForLevelAndField(
+        educationScore,
+        job.degreeRequirement,
+        applicant.highestEducationalAttainment,
+        job.degreeLevel,
+        applicant.degreeLevel,
+        job.degreeFieldGroup,
+        applicant.degreeFieldGroup
+      );
+    }
   }
 
   // Experience (continuous yearsScore)
@@ -1310,29 +1347,8 @@ export async function algorithm1_WeightedSum(
   let relevanceScore: number;
   if (applicantYears === 0) {
     relevanceScore = 0;
-  } else if (!applicant.workExperienceTitles || applicant.workExperienceTitles.length === 0) {
-    relevanceScore = 50;
-  } else if (job.title) {
-    const jobTitleLower = job.title.toLowerCase().trim();
-    let bestTitleMatch = 0;
-
-    for (const expTitle of applicant.workExperienceTitles) {
-      const similarity = stringSimilarity(jobTitleLower, expTitle.toLowerCase().trim());
-      bestTitleMatch = Math.max(bestTitleMatch, similarity);
-
-      const jobTokens = normalizeSkill(jobTitleLower);
-      const expTokens = normalizeSkill(expTitle.toLowerCase());
-      const commonTokens = jobTokens.filter(token => expTokens.includes(token));
-
-      if (commonTokens.length > 0) {
-        const tokenScore = (commonTokens.length / jobTokens.length) * 80;
-        bestTitleMatch = Math.max(bestTitleMatch, tokenScore);
-      }
-    }
-
-    relevanceScore = bestTitleMatch;
   } else {
-    relevanceScore = 50;
+    relevanceScore = 100;
   }
 
   const experienceScore = yearsScore * 0.7 + relevanceScore * 0.3;
@@ -1397,32 +1413,10 @@ export async function algorithm2_SkillExperienceComposite(
   const yearsScore = computeYearsScore(requiredYears, applicantYears);
 
   let relevanceScore: number;
-
   if (applicantYears === 0) {
     relevanceScore = 0;
-  } else if (!applicant.workExperienceTitles || applicant.workExperienceTitles.length === 0) {
-    relevanceScore = 50;
-  } else if (job.title) {
-    const jobTitleLower = job.title.toLowerCase().trim();
-    let bestTitleMatch = 0;
-
-    for (const expTitle of applicant.workExperienceTitles) {
-      const similarity = stringSimilarity(jobTitleLower, expTitle.toLowerCase().trim());
-      bestTitleMatch = Math.max(bestTitleMatch, similarity);
-
-      const jobTokens = normalizeSkill(jobTitleLower);
-      const expTokens = normalizeSkill(expTitle.toLowerCase());
-      const commonTokens = jobTokens.filter(token => expTokens.includes(token));
-
-      if (commonTokens.length > 0) {
-        const tokenScore = (commonTokens.length / jobTokens.length) * 80;
-        bestTitleMatch = Math.max(bestTitleMatch, tokenScore);
-      }
-    }
-
-    relevanceScore = bestTitleMatch;
   } else {
-    relevanceScore = 50;
+    relevanceScore = 100;
   }
 
   const experienceScore = yearsScore * 0.7 + relevanceScore * 0.3;
@@ -1431,37 +1425,43 @@ export async function algorithm2_SkillExperienceComposite(
   const composite =
     (skillsScore * Math.exp(beta * Math.min(experienceRatio, 2))) / Math.exp(beta * 2);
 
-  const jobDegreeRaw = job.degreeRequirement;
-  const applicantDegreeRaw = applicant.highestEducationalAttainment;
+  const jobDegreeRaw = job.degreeRequirement || '';
+  const applicantDegreeRaw = applicant.highestEducationalAttainment || '';
 
-  const jobDegree = jobDegreeRaw.toLowerCase().trim();
-  const applicantDegree = applicantDegreeRaw.toLowerCase().trim();
+  let educationScore: number;
 
-  let educationScore = matchDegreeRequirement(jobDegree, applicantDegree);
-
-  const andInfo = evaluateDegreeAndGate(jobDegreeRaw, applicantDegreeRaw);
-
-  if (andInfo.isAnd && !andInfo.allHit) {
-    const originalScore = educationScore;
-    educationScore = 0;
-
-    console.log('🔍 [Algorithm 2] Degree AND gate NOT satisfied, forcing educationScore to 0', {
-      jobDegreeRaw,
-      applicantDegreeRaw,
-      hits: andInfo.hits,
-      required: andInfo.required,
-      originalScore,
-    });
+  if (isNoRequirementText(jobDegreeRaw)) {
+    educationScore = 50;
   } else {
-    educationScore = adjustEducationForLevelAndField(
-      educationScore,
-      job.degreeRequirement,
-      applicant.highestEducationalAttainment,
-      job.degreeLevel,
-      applicant.degreeLevel,
-      job.degreeFieldGroup,
-      applicant.degreeFieldGroup
-    );
+    const jobDegree = jobDegreeRaw.toLowerCase().trim();
+    const applicantDegree = applicantDegreeRaw.toLowerCase().trim();
+
+    educationScore = matchDegreeRequirement(jobDegree, applicantDegree);
+
+    const andInfo = evaluateDegreeAndGate(jobDegreeRaw, applicantDegreeRaw);
+
+    if (andInfo.isAnd && !andInfo.allHit) {
+      const originalScore = educationScore;
+      educationScore = 0;
+
+      console.log('🔍 [Algorithm 2] Degree AND gate NOT satisfied, forcing educationScore to 0', {
+        jobDegreeRaw,
+        applicantDegreeRaw,
+        hits: andInfo.hits,
+        required: andInfo.required,
+        originalScore,
+      });
+    } else {
+      educationScore = adjustEducationForLevelAndField(
+        educationScore,
+        job.degreeRequirement,
+        applicant.highestEducationalAttainment,
+        job.degreeLevel,
+        applicant.degreeLevel,
+        job.degreeFieldGroup,
+        applicant.degreeFieldGroup
+      );
+    }
   }
 
   const jobEligibilitiesRaw = job.eligibilities;
@@ -1519,10 +1519,9 @@ export async function algorithm3_EligibilityEducationTiebreaker(
   let eligibilityContribution: number;
   if (
     jobEligibilitiesRaw.length === 0 ||
-    jobEligibilitiesRaw.some(e =>
-      e.toLowerCase().includes('none') || e.toLowerCase().includes('not required')
-    )
+    jobEligibilitiesRaw.some(e => isNoRequirementText(e))
   ) {
+    // Neutral 50% of the 40-point eligibility weight → 20 points
     eligibilityContribution = 20;
     reasoning.push('No license required (+20)');
   } else {
@@ -1543,37 +1542,44 @@ export async function algorithm3_EligibilityEducationTiebreaker(
     eligibilityScore,
   });
 
-  const jobDegreeRaw = job.degreeRequirement;
-  const applicantDegreeRaw = applicant.highestEducationalAttainment;
+  const jobDegreeRaw = job.degreeRequirement || '';
+  const applicantDegreeRaw = applicant.highestEducationalAttainment || '';
 
-  const jobDegree = jobDegreeRaw.toLowerCase().trim();
-  const applicantDegree = applicantDegreeRaw.toLowerCase().trim();
+  let educationScore: number;
 
-  let educationScore = matchDegreeRequirement(jobDegree, applicantDegree);
-
-  const andInfo = evaluateDegreeAndGate(jobDegreeRaw, applicantDegreeRaw);
-
-  if (andInfo.isAnd && !andInfo.allHit) {
-    const originalScore = educationScore;
-    educationScore = 0;
-
-    console.log('🔍 [Algorithm 3] Degree AND gate NOT satisfied, forcing educationScore to 0', {
-      jobDegreeRaw,
-      applicantDegreeRaw,
-      hits: andInfo.hits,
-      required: andInfo.required,
-      originalScore,
-    });
+  if (isNoRequirementText(jobDegreeRaw)) {
+    // No degree requirement – neutral contribution
+    educationScore = 50;
   } else {
-    educationScore = adjustEducationForLevelAndField(
-      educationScore,
-      job.degreeRequirement,
-      applicant.highestEducationalAttainment,
-      job.degreeLevel,
-      applicant.degreeLevel,
-      job.degreeFieldGroup,
-      applicant.degreeFieldGroup
-    );
+    const jobDegree = jobDegreeRaw.toLowerCase().trim();
+    const applicantDegree = applicantDegreeRaw.toLowerCase().trim();
+
+    educationScore = matchDegreeRequirement(jobDegree, applicantDegree);
+
+    const andInfo = evaluateDegreeAndGate(jobDegreeRaw, applicantDegreeRaw);
+
+    if (andInfo.isAnd && !andInfo.allHit) {
+      const originalScore = educationScore;
+      educationScore = 0;
+
+      console.log('🔍 [Algorithm 3] Degree AND gate NOT satisfied, forcing educationScore to 0', {
+        jobDegreeRaw,
+        applicantDegreeRaw,
+        hits: andInfo.hits,
+        required: andInfo.required,
+        originalScore,
+      });
+    } else {
+      educationScore = adjustEducationForLevelAndField(
+        educationScore,
+        job.degreeRequirement,
+        applicant.highestEducationalAttainment,
+        job.degreeLevel,
+        applicant.degreeLevel,
+        job.degreeFieldGroup,
+        applicant.degreeFieldGroup
+      );
+    }
   }
 
   const eduScoreContribution = (educationScore / 100) * 30;
@@ -1586,26 +1592,14 @@ export async function algorithm3_EligibilityEducationTiebreaker(
   const yearsScore = computeYearsScore(requiredYears, applicantYears);
 
   let relevanceScore: number;
-
   if (applicantYears === 0) {
     relevanceScore = 0;
-  } else if (!applicant.workExperienceTitles || applicant.workExperienceTitles.length === 0) {
-    relevanceScore = 50;
-  } else if (job.title) {
-    const jobTitleLower = job.title.toLowerCase().trim();
-    let bestTitleMatch = 0;
-
-    for (const expTitle of applicant.workExperienceTitles) {
-      const similarity = stringSimilarity(jobTitleLower, expTitle.toLowerCase().trim());
-      bestTitleMatch = Math.max(bestTitleMatch, similarity);
-    }
-
-    relevanceScore = bestTitleMatch;
   } else {
-    relevanceScore = 50;
+    relevanceScore = 100;
   }
 
   const experienceScore = yearsScore * 0.7 + relevanceScore * 0.3;
+
   const excessYears = Math.max(0, applicantYears - requiredYears);
   const experienceBonus = Math.min((experienceScore / 100) * 20, 20);
   totalScore += experienceBonus;
