@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { Badge } from '@/components/ui/Badge';
+import { ProgramStatusBadge, type ProgramStatus } from '@/components/peso/ProgramStatusBadge';
 import {
   GraduationCap,
   Calendar,
@@ -29,7 +30,7 @@ interface TrainingProgram {
   end_date?: string;
   skills_covered?: string[];
   icon?: string;
-  status: 'active' | 'upcoming' | 'archived';
+  status: ProgramStatus;
   created_by: string;
   created_at: string;
   profiles?: {
@@ -112,9 +113,7 @@ export function TrainingCard({ training, onView }: TrainingCardProps) {
 
         {/* Status Badge */}
         <div className="absolute top-3 left-3">
-          <span className="px-3 py-1.5 rounded-full text-xs font-semibold shadow-md bg-white/90 text-gray-700">
-            {training.status === 'active' ? 'Active' : training.status === 'upcoming' ? 'Upcoming' : 'Completed'}
-          </span>
+          <ProgramStatusBadge status={training.status} size="md" className="shadow-md" />
         </div>
       </div>
 

@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
         end_date: body.end_date || null,
         skills_covered: skills_covered || [],
         icon: icon || 'GraduationCap',
-        status: 'active',
+        status: 'upcoming',
         created_by: user.id,
       })
       .select(`

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { notifyPESO, notifyProgramApplicants, notifyAdmins } from '@/lib/notifications';
+import { validateStatusTransition, isValidProgramStatus, type TrainingProgramStatus } from '@/lib/utils/statusTransitions';
 
 /**
  * Training Program Management API - Individual Program Operations
@@ -151,12 +152,35 @@ export async function PUT(
     }
 
     // 8. Validate status if provided
-    const validStatuses = ['active', 'upcoming', 'completed', 'cancelled', 'archived'];
-    if (status && !validStatuses.includes(status)) {
-      return NextResponse.json(
-        { success: false, error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
-        { status: 400 }
-      );
+    if (status) {
+      // Check if status is a valid program status
+      if (!isValidProgramStatus(status)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Invalid status "${status}". Must be one of: active, upcoming, ongoing, completed, cancelled, archived`
+          },
+          { status: 400 }
+        );
+      }
+
+      // Validate status transition
+      const currentStatus = existingProgram.status as TrainingProgramStatus;
+      const newStatus = status as TrainingProgramStatus;
+      const validation = validateStatusTransition(currentStatus, newStatus);
+
+      if (!validation.isValid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: validation.error,
+            suggestion: validation.suggestion,
+            currentStatus,
+            attemptedStatus: newStatus
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // 9. Build update object

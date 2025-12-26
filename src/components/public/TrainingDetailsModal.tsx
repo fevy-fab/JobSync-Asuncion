@@ -8,6 +8,7 @@
 import React from 'react';
 import { ModernModal } from '@/components/ui/ModernModal';
 import { Button, Badge } from '@/components/ui';
+import { ProgramStatusBadge, type ProgramStatus } from '@/components/peso/ProgramStatusBadge';
 import {
   GraduationCap,
   Calendar,
@@ -37,7 +38,7 @@ interface TrainingProgram {
   end_date?: string;
   skills_covered?: string[];
   icon?: string;
-  status: 'active' | 'upcoming' | 'archived';
+  status: ProgramStatus;
   created_by: string;
   created_at: string;
   profiles?: {
@@ -53,22 +54,6 @@ interface TrainingDetailsModalProps {
 
 export function TrainingDetailsModal({ training, isOpen, onClose }: TrainingDetailsModalProps) {
   if (!training) return null;
-
-  // Get status badge configuration
-  const getStatusBadge = () => {
-    switch (training.status) {
-      case 'active':
-        return { variant: 'success' as const, icon: CheckCircle2, label: 'Active' };
-      case 'upcoming':
-        return { variant: 'info' as const, icon: Clock, label: 'Upcoming' };
-      case 'archived':
-        return { variant: 'secondary' as const, icon: Archive, label: 'Completed' };
-      default:
-        return { variant: 'secondary' as const, icon: AlertCircle, label: training.status };
-    }
-  };
-
-  const statusBadge = getStatusBadge();
 
   // Check if training is new (created within last 7 days)
   const isNew = () => {
@@ -114,9 +99,7 @@ export function TrainingDetailsModal({ training, isOpen, onClose }: TrainingDeta
                   New
                 </Badge>
               )}
-              <Badge variant={statusBadge.variant} icon={statusBadge.icon}>
-                {statusBadge.label}
-              </Badge>
+              <ProgramStatusBadge status={training.status} size="md" />
             </div>
           </div>
         </div>

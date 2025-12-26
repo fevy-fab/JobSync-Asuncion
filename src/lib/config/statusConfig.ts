@@ -1,4 +1,4 @@
-import { CheckCircle, Clock, XCircle, Eye, Star, Calendar, Briefcase, Archive, AlertCircle, UserCheck, Play, Award, Ban } from 'lucide-react';
+import { CheckCircle, CheckCircle2, Clock, XCircle, Eye, Star, Calendar, Briefcase, Archive, AlertCircle, UserCheck, Play, PlayCircle, Award, Ban } from 'lucide-react';
 
 /**
  * Centralized Status Configuration
@@ -249,4 +249,114 @@ export const isTrainingStatus = (status: string): boolean => {
  */
 export const isJobStatus = (status: string): boolean => {
   return getJobStatuses().includes(status as JobStatus);
+};
+
+// ============================================================================
+// TRAINING PROGRAM STATUS CONFIGURATION (Program lifecycle, not applications)
+// ============================================================================
+
+/**
+ * Training Program Status Type
+ * Represents the lifecycle stage of a training program itself
+ */
+export type TrainingProgramStatus = 'active' | 'upcoming' | 'ongoing' | 'completed' | 'cancelled' | 'archived';
+
+/**
+ * Training Program Status Configuration
+ *
+ * Status Workflow:
+ * upcoming → active → ongoing → completed
+ *    ↓        ↓        ↓         ↓
+ * cancelled  cancelled cancelled cancelled
+ *    ↓        ↓        ↓         ↓
+ * archived  archived  archived  archived
+ */
+export const trainingProgramStatusConfig: Record<TrainingProgramStatus, StatusConfig> = {
+  active: {
+    label: 'Active',
+    color: 'green',
+    bgColor: 'bg-green-50',
+    textColor: 'text-green-700',
+    borderColor: 'border-green-200',
+    hoverColor: 'hover:bg-green-100',
+    legacyColor: 'bg-green-100 text-green-800 border-green-200',
+    icon: CheckCircle2,
+    description: 'Accepting enrollments',
+  },
+  upcoming: {
+    label: 'Upcoming',
+    color: 'blue',
+    bgColor: 'bg-blue-50',
+    textColor: 'text-blue-700',
+    borderColor: 'border-blue-200',
+    hoverColor: 'hover:bg-blue-100',
+    legacyColor: 'bg-blue-100 text-blue-800 border-blue-200',
+    icon: Calendar,
+    description: 'Scheduled, not started',
+  },
+  ongoing: {
+    label: 'Ongoing',
+    color: 'purple',
+    bgColor: 'bg-purple-50',
+    textColor: 'text-purple-700',
+    borderColor: 'border-purple-200',
+    hoverColor: 'hover:bg-purple-100',
+    legacyColor: 'bg-purple-100 text-purple-800 border-purple-200',
+    icon: PlayCircle,
+    description: 'In progress, training started',
+  },
+  completed: {
+    label: 'Completed',
+    color: 'teal',
+    bgColor: 'bg-teal-50',
+    textColor: 'text-teal-700',
+    borderColor: 'border-teal-200',
+    hoverColor: 'hover:bg-teal-100',
+    legacyColor: 'bg-teal-100 text-teal-800 border-teal-200',
+    icon: Award,
+    description: 'Finished successfully',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    color: 'red',
+    bgColor: 'bg-red-50',
+    textColor: 'text-red-700',
+    borderColor: 'border-red-200',
+    hoverColor: 'hover:bg-red-100',
+    legacyColor: 'bg-red-100 text-red-800 border-red-200',
+    icon: XCircle,
+    description: 'Cancelled before/during execution',
+  },
+  archived: {
+    label: 'Archived',
+    color: 'gray',
+    bgColor: 'bg-gray-50',
+    textColor: 'text-gray-700',
+    borderColor: 'border-gray-200',
+    hoverColor: 'hover:bg-gray-100',
+    legacyColor: 'bg-gray-100 text-gray-800 border-gray-200',
+    icon: Archive,
+    description: 'Historical, old programs',
+  },
+};
+
+/**
+ * Get status configuration for a training program status
+ */
+export const getProgramStatusConfig = (status: TrainingProgramStatus): StatusConfig => {
+  return trainingProgramStatusConfig[status];
+};
+
+/**
+ * Get all training program statuses
+ */
+export const getTrainingProgramStatuses = (): TrainingProgramStatus[] => {
+  return Object.keys(trainingProgramStatusConfig) as TrainingProgramStatus[];
+};
+
+/**
+ * Check if a status is a training program status
+ */
+export const isTrainingProgramStatus = (status: string): boolean => {
+  return getTrainingProgramStatuses().includes(status as TrainingProgramStatus);
 };

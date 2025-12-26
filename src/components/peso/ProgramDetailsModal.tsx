@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { ModernModal, Button, Badge } from '@/components/ui';
+import { ProgramStatusBadge, type ProgramStatus } from './ProgramStatusBadge';
 import {
   GraduationCap,
   Calendar,
@@ -52,24 +53,6 @@ interface ProgramDetailsModalProps {
 }
 
 export function ProgramDetailsModal({ program, isOpen, onClose, onEdit }: ProgramDetailsModalProps) {
-  // Get status badge configuration
-  const getStatusBadge = () => {
-    if (!program) return { variant: 'secondary' as const, icon: AlertCircle, label: 'Unknown' };
-
-    switch (program.status) {
-      case 'active':
-        return { variant: 'success' as const, icon: CheckCircle2, label: 'Active' };
-      case 'upcoming':
-        return { variant: 'info' as const, icon: Clock, label: 'Upcoming' };
-      case 'archived':
-        return { variant: 'secondary' as const, icon: Archive, label: 'Completed' };
-      default:
-        return { variant: 'secondary' as const, icon: AlertCircle, label: program.status };
-    }
-  };
-
-  const statusBadge = getStatusBadge();
-
   // Format date
   const formatDate = (dateString: string | undefined) => {
     if (!dateString) return 'N/A';
@@ -99,9 +82,7 @@ export function ProgramDetailsModal({ program, isOpen, onClose, onEdit }: Progra
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">{program.title}</h2>
-            <Badge variant={statusBadge.variant} icon={statusBadge.icon}>
-              {statusBadge.label}
-            </Badge>
+            <ProgramStatusBadge status={program.status} size="md" />
           </div>
         </div>
 

@@ -313,9 +313,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (program.status !== 'active') {
+    // 5. Validate program status (only 'active' programs accept enrollment)
+    const enrollableStatuses = ['active'];
+    if (!enrollableStatuses.includes(program.status)) {
+      let errorMessage = 'This training program is not accepting applications';
+
+      if (program.status === 'upcoming') {
+        errorMessage = 'This training program is scheduled but not yet accepting applications. Please check back when it becomes active.';
+      } else if (program.status === 'ongoing') {
+        errorMessage = 'This training program has already started and is no longer accepting new enrollments';
+      } else if (program.status === 'completed') {
+        errorMessage = 'This training program has already been completed';
+      } else if (program.status === 'cancelled') {
+        errorMessage = 'This training program has been cancelled';
+      } else if (program.status === 'archived') {
+        errorMessage = 'This training program is no longer available';
+      }
+
       return NextResponse.json(
-        { success: false, error: 'This training program is no longer accepting applications' },
+        { success: false, error: errorMessage },
         { status: 400 }
       );
     }

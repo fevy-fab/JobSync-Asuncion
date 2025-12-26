@@ -4,10 +4,12 @@ import { AdminLayout } from '@/components/layout';
 import { Card, Button, Input, Textarea, Container, Badge, RefreshButton, ModernModal } from '@/components/ui';
 import { ProgramCard } from '@/components/peso/ProgramCard';
 import { ProgramDetailsModal } from '@/components/peso/ProgramDetailsModal';
+import { ProgramStatusBadge, type ProgramStatus } from '@/components/peso/ProgramStatusBadge';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Edit, Trash2, GraduationCap, Clock, Users, CheckCircle2, Archive, Loader2, Filter, Undo2, Search, Briefcase } from 'lucide-react';
+import { getValidTransitions, type TrainingProgramStatus } from '@/lib/utils/statusTransitions';
+import { Plus, Edit, Trash2, GraduationCap, Clock, Users, CheckCircle2, Archive, Loader2, Filter, Undo2, Search, Briefcase, MoreVertical, ArrowRight, PlayCircle, Award, UserCheck } from 'lucide-react';
 
 interface TrainingProgram {
   id: string;
@@ -23,8 +25,7 @@ interface TrainingProgram {
   end_date?: string;
   skills_covered?: string[];
   icon?: string;
-//  status: 'active' | 'upcoming' | 'completed' | 'cancelled' | 'archived';
-  status: 'active' | 'upcoming' | 'archived';
+  status: ProgramStatus;
   created_by: string;
   created_at: string;
   profiles?: {
@@ -40,8 +41,7 @@ export default function PESOProgramsPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-//  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'upcoming' | 'completed' | 'cancelled' | 'archived'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'upcoming' | 'archived'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | ProgramStatus>('all');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -49,12 +49,15 @@ export default function PESOProgramsPage() {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showStatusChangeModal, setShowStatusChangeModal] = useState(false);
 
   const [editingProgram, setEditingProgram] = useState<TrainingProgram | null>(null);
   const [deletingProgram, setDeletingProgram] = useState<TrainingProgram | null>(null);
   const [archivingProgram, setArchivingProgram] = useState<TrainingProgram | null>(null);
   const [restoringProgram, setRestoringProgram] = useState<TrainingProgram | null>(null);
   const [previewProgram, setPreviewProgram] = useState<TrainingProgram | null>(null);
+  const [changingStatusProgram, setChangingStatusProgram] = useState<TrainingProgram | null>(null);
+  const [newStatus, setNewStatus] = useState<ProgramStatus | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -278,7 +281,10 @@ export default function PESOProgramsPage() {
         setRestoringProgram(null);
         fetchPrograms();
       } else {
-        showToast(getErrorMessage(result.error), 'error');
+        const errorMsg = result.suggestion
+          ? `${result.error}\n\n${result.suggestion}`
+          : getErrorMessage(result.error);
+        showToast(errorMsg, 'error');
       }
     } catch (error) {
       console.error('Error restoring program:', error);
@@ -328,13 +334,59 @@ export default function PESOProgramsPage() {
     setShowPreviewModal(true);
   };
 
+  // Handle status change
+  const handleStatusChangeClick = (program: TrainingProgram, status: ProgramStatus) => {
+    setChangingStatusProgram(program);
+    setNewStatus(status);
+    setShowStatusChangeModal(true);
+  };
+
+  const handleStatusChange = async () => {
+    if (!changingStatusProgram || !newStatus) return;
+
+    try {
+      setSubmitting(true);
+
+      const response = await fetch(`/api/training/programs/${changingStatusProgram.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...changingStatusProgram,
+          status: newStatus,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`Program status changed to "${newStatus}" successfully`, 'success');
+        setShowStatusChangeModal(false);
+        setChangingStatusProgram(null);
+        setNewStatus(null);
+        fetchPrograms();
+      } else {
+        // Show detailed error with suggestion if available
+        const errorMsg = result.suggestion
+          ? `${result.error}\n\n${result.suggestion}`
+          : getErrorMessage(result.error);
+        showToast(errorMsg, 'error');
+      }
+    } catch (error) {
+      console.error('Error changing program status:', error);
+      showToast('Failed to change program status', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Calculate stats
   const stats = {
     total: programs.length,
     active: programs.filter(p => p.status === 'active').length,
     upcoming: programs.filter(p => p.status === 'upcoming').length,
-//    completed: programs.filter(p => p.status === 'completed').length,
-//    cancelled: programs.filter(p => p.status === 'cancelled').length,
+    ongoing: programs.filter(p => p.status === 'ongoing').length,
+    completed: programs.filter(p => p.status === 'completed').length,
+    cancelled: programs.filter(p => p.status === 'cancelled').length,
     archived: programs.filter(p => p.status === 'archived').length,
     totalEnrolled: programs.reduce((sum, p) => sum + p.enrolled_count, 0),
     totalCapacity: programs.reduce((sum, p) => sum + p.capacity, 0),
@@ -387,7 +439,7 @@ export default function PESOProgramsPage() {
         </div>
 
         {/* Stats Tiles */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <Card variant="flat" className="bg-gradient-to-br from-blue-50 to-blue-100 border-l-4 border-blue-500 hover:shadow-xl transition-all duration-300">
             <div className="flex items-center justify-between">
               <div>
@@ -395,7 +447,7 @@ export default function PESOProgramsPage() {
                 <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.total}</p>
               </div>
               <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center shadow-lg">
-                <Briefcase className="w-6 h-6 text-white" />
+                <GraduationCap className="w-6 h-6 text-white" />
               </div>
             </div>
           </Card>
@@ -403,11 +455,11 @@ export default function PESOProgramsPage() {
           <Card variant="flat" className="bg-gradient-to-br from-green-50 to-green-100 border-l-4 border-green-500 hover:shadow-xl transition-all duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Active</p>
-                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.active}</p>
+                <p className="text-sm text-gray-600 mb-1">Accepting Enrollment</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.active + stats.upcoming}</p>
               </div>
               <div className="w-12 h-12 bg-[#22A555] rounded-xl flex items-center justify-center shadow-lg">
-                <CheckCircle2 className="w-6 h-6 text-white" />
+                <UserCheck className="w-6 h-6 text-white" />
               </div>
             </div>
           </Card>
@@ -415,11 +467,23 @@ export default function PESOProgramsPage() {
           <Card variant="flat" className="bg-gradient-to-br from-purple-50 to-purple-100 border-l-4 border-purple-500 hover:shadow-xl transition-all duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Enrolled</p>
-                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.totalEnrolled}</p>
+                <p className="text-sm text-gray-600 mb-1">Ongoing</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.ongoing}</p>
               </div>
               <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                <Users className="w-6 h-6 text-white" />
+                <PlayCircle className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </Card>
+
+          <Card variant="flat" className="bg-gradient-to-br from-teal-50 to-teal-100 border-l-4 border-teal-500 hover:shadow-xl transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Completed</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.completed}</p>
+              </div>
+              <div className="w-12 h-12 bg-teal-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Award className="w-6 h-6 text-white" />
               </div>
             </div>
           </Card>
@@ -427,23 +491,11 @@ export default function PESOProgramsPage() {
           <Card variant="flat" className="bg-gradient-to-br from-orange-50 to-orange-100 border-l-4 border-orange-500 hover:shadow-xl transition-all duration-300">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Capacity Remaining</p>
-                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.totalCapacity - stats.totalEnrolled}</p>
+                <p className="text-sm text-gray-600 mb-1">Total Enrolled</p>
+                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.totalEnrolled}</p>
               </div>
               <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
-                <GraduationCap className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="flat" className="bg-gradient-to-br from-slate-50 to-slate-100 border-l-4 border-slate-500 hover:shadow-xl transition-all duration-300">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Completed</p>
-                <p className="text-3xl font-bold text-gray-900">{loading ? '...' : stats.archived}</p>
-              </div>
-              <div className="w-12 h-12 bg-slate-500 rounded-xl flex items-center justify-center shadow-lg">
-                <Archive className="w-6 h-6 text-white" />
+                <Users className="w-6 h-6 text-white" />
               </div>
             </div>
           </Card>
@@ -455,7 +507,7 @@ export default function PESOProgramsPage() {
             <Filter className="w-5 h-5" />
             <span className="font-medium">Filter by Status:</span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               variant={statusFilter === 'all' ? 'primary' : 'secondary'}
               size="sm"
@@ -470,14 +522,41 @@ export default function PESOProgramsPage() {
             >
               Active ({stats.active})
             </Button>
-
+            <Button
+              variant={statusFilter === 'upcoming' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => setStatusFilter('upcoming')}
+            >
+              Upcoming ({stats.upcoming})
+            </Button>
+            <Button
+              variant={statusFilter === 'ongoing' ? 'warning' : 'secondary'}
+              size="sm"
+              onClick={() => setStatusFilter('ongoing')}
+            >
+              Ongoing ({stats.ongoing})
+            </Button>
+            <Button
+              variant={statusFilter === 'completed' ? 'success' : 'secondary'}
+              size="sm"
+              onClick={() => setStatusFilter('completed')}
+            >
+              Completed ({stats.completed})
+            </Button>
+            <Button
+              variant={statusFilter === 'cancelled' ? 'danger' : 'secondary'}
+              size="sm"
+              onClick={() => setStatusFilter('cancelled')}
+            >
+              Cancelled ({stats.cancelled})
+            </Button>
             <Button
               variant={statusFilter === 'archived' ? 'secondary' : 'secondary'}
               size="sm"
               onClick={() => setStatusFilter('archived')}
             >
               <Archive className="w-4 h-4" />
-              Completed ({stats.archived})
+              Archived ({stats.archived})
             </Button>
           </div>
         </div>
@@ -542,6 +621,7 @@ export default function PESOProgramsPage() {
                 onArchive={handleArchiveClick}
                 onRestore={handleRestoreClick}
                 onDelete={handleDeleteClick}
+                onChangeStatus={handleStatusChangeClick}
               />
             ))}
           </div>
@@ -871,6 +951,73 @@ export default function PESOProgramsPage() {
                     {submitting ? 'Restoring...' : 'Restore Program'}
                   </Button>
                 </div>
+            </div>
+          </ModernModal>
+        )}
+
+        {/* Status Change Confirmation Modal */}
+        {changingStatusProgram && newStatus && (
+          <ModernModal
+            isOpen={showStatusChangeModal}
+            onClose={() => {
+              setShowStatusChangeModal(false);
+              setChangingStatusProgram(null);
+              setNewStatus(null);
+            }}
+            title="Change Program Status"
+            subtitle="Update training program lifecycle status"
+            colorVariant="blue"
+            icon={ArrowRight}
+            size="md"
+          >
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm text-gray-700 mb-3">
+                  You are about to change the status of "<strong>{changingStatusProgram.title}</strong>"
+                </p>
+                <div className="flex items-center justify-center gap-3">
+                  <ProgramStatusBadge status={changingStatusProgram.status} size="lg" />
+                  <ArrowRight className="text-gray-400" size={20} />
+                  <ProgramStatusBadge status={newStatus} size="lg" />
+                </div>
+              </div>
+
+              {(newStatus === 'cancelled' || newStatus === 'archived') && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <p className="text-sm text-amber-800">
+                    <strong>Warning:</strong> This action cannot be easily reversed.
+                    {newStatus === 'archived' && ' Archived programs are hidden from most views.'}
+                    {newStatus === 'cancelled' && ' Enrolled applicants will be notified.'}
+                  </p>
+                </div>
+              )}
+
+              <p className="text-gray-600 text-center text-sm">
+                Are you sure you want to proceed with this status change?
+              </p>
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowStatusChangeModal(false);
+                    setChangingStatusProgram(null);
+                    setNewStatus(null);
+                  }}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={ArrowRight}
+                  loading={submitting}
+                  onClick={handleStatusChange}
+                  className="flex-1"
+                >
+                  {submitting ? 'Changing...' : 'Change Status'}
+                </Button>
+              </div>
             </div>
           </ModernModal>
         )}

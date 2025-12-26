@@ -5,8 +5,10 @@
  * Similar to announcements card design for consistent UI/UX
  */
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Badge, Button } from '@/components/ui';
+import { ProgramStatusBadge, type ProgramStatus } from './ProgramStatusBadge';
+import { getValidTransitions } from '@/lib/utils/statusTransitions';
 import {
   GraduationCap,
   Calendar,
@@ -19,7 +21,10 @@ import {
   Undo2,
   Trash2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  MoreVertical,
+  ArrowRight,
+  ChevronDown
 } from 'lucide-react';
 
 interface TrainingProgram {
@@ -36,7 +41,7 @@ interface TrainingProgram {
   end_date?: string;
   skills_covered?: string[];
   icon?: string;
-  status: 'active' | 'upcoming' | 'archived';
+  status: ProgramStatus;
   created_by: string;
   created_at: string;
   profiles?: {
@@ -51,26 +56,32 @@ interface ProgramCardProps {
   onArchive: (program: TrainingProgram) => void;
   onRestore: (program: TrainingProgram) => void;
   onDelete: (program: TrainingProgram) => void;
+  onChangeStatus?: (program: TrainingProgram, newStatus: ProgramStatus) => void;
 }
 
-export function ProgramCard({ program, onView, onEdit, onArchive, onRestore, onDelete }: ProgramCardProps) {
+export function ProgramCard({ program, onView, onEdit, onArchive, onRestore, onDelete, onChangeStatus }: ProgramCardProps) {
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const isArchived = program.status === 'archived';
 
-  // Get status badge configuration
-  const getStatusBadge = () => {
-    switch (program.status) {
-      case 'active':
-        return { variant: 'success' as const, icon: CheckCircle2, label: 'Active' };
-      case 'upcoming':
-        return { variant: 'info' as const, icon: Clock, label: 'Upcoming' };
-      case 'archived':
-        return { variant: 'secondary' as const, icon: Archive, label: 'Completed' };
-      default:
-        return { variant: 'secondary' as const, icon: AlertCircle, label: program.status };
-    }
-  };
+  // Get valid status transitions for this program
+  const validTransitions = getValidTransitions(program.status as any);
 
-  const statusBadge = getStatusBadge();
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowStatusMenu(false);
+      }
+    }
+
+    if (showStatusMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showStatusMenu]);
 
   // Format date
   const formatDate = (dateString: string) => {
@@ -84,19 +95,17 @@ export function ProgramCard({ program, onView, onEdit, onArchive, onRestore, onD
   return (
     <div
       onClick={() => onView(program)}
-      className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-xl transition-all duration-200 cursor-pointer group"
+      className="bg-white border border-gray-200 rounded-xl hover:shadow-xl transition-all duration-200 cursor-pointer group"
     >
       {/* Header Image/Icon Section */}
-      <div className="relative w-full h-48 bg-gradient-to-br from-[#D4F4DD] to-[#22A555]">
+      <div className="relative w-full h-48 bg-gradient-to-br from-[#D4F4DD] to-[#22A555] rounded-t-xl overflow-hidden">
         <div className="absolute inset-0 flex items-center justify-center">
           <GraduationCap className="w-24 h-24 text-white opacity-80" />
         </div>
 
         {/* Status Badge Overlay */}
         <div className="absolute top-3 right-3">
-          <Badge variant={statusBadge.variant} icon={statusBadge.icon} className="shadow-md">
-            {statusBadge.label}
-          </Badge>
+          <ProgramStatusBadge status={program.status} size="md" className="shadow-md" />
         </div>
 
         {/* Enrolled Count Badge */}
@@ -155,53 +164,69 @@ export function ProgramCard({ program, onView, onEdit, onArchive, onRestore, onD
 
         {/* Action Buttons */}
         <div className="pt-3 border-t border-gray-100">
-          <div className="flex gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
-            {/* Non-archived programs: Edit + Archive */}
-            {!isArchived && (
-              <>
+          <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+            {/* Edit Button */}
+            <Button
+              variant="warning"
+              size="sm"
+              icon={Edit}
+              onClick={(e) => { e.stopPropagation(); onEdit(program); }}
+              className="flex-1"
+            >
+              Edit
+            </Button>
+
+            {/* Status Change Dropdown - only if handler is provided and has valid transitions */}
+            {onChangeStatus && validTransitions.length > 0 && (
+              <div className="relative" ref={dropdownRef}>
                 <Button
-                  variant="warning"
+                  variant={showStatusMenu ? "primary" : "secondary"}
                   size="sm"
-                  icon={Edit}
-                  onClick={(e) => { e.stopPropagation(); onEdit(program); }}
-                  className="flex-1"
+                  onClick={(e) => { e.stopPropagation(); setShowStatusMenu(!showStatusMenu); }}
+                  className="flex items-center gap-1 px-3 min-w-fit"
+                  title="Change program status"
                 >
-                  Edit
+                  <span className="text-xs font-medium">Status</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showStatusMenu ? 'rotate-180' : ''}`} />
                 </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  icon={Archive}
-                  onClick={(e) => { e.stopPropagation(); onArchive(program); }}
-                  className="flex-1"
-                >
-                  Complete
-                </Button>
-              </>
+
+                {showStatusMenu && (
+                  <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden">
+                    <div className="p-2 space-y-1">
+                      <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase bg-gray-50 rounded">
+                        Change Status To
+                      </div>
+                      {validTransitions.map((status) => (
+                        <button
+                          key={status}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onChangeStatus(program, status);
+                            setShowStatusMenu(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left rounded-md hover:bg-blue-50 transition-colors group"
+                        >
+                          <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                          <ProgramStatusBadge status={status} size="sm" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* Archived programs: Restore + Delete */}
+            {/* Delete Button - only for archived */}
             {isArchived && (
-              <>
-                <Button
-                  variant="success"
-                  size="sm"
-                  icon={Undo2}
-                  onClick={(e) => { e.stopPropagation(); onRestore(program); }}
-                  className="flex-1"
-                >
-                  Restore
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  icon={Trash2}
-                  onClick={(e) => { e.stopPropagation(); onDelete(program); }}
-                  className="flex-1"
-                >
-                  Delete
-                </Button>
-              </>
+              <Button
+                variant="danger"
+                size="sm"
+                icon={Trash2}
+                onClick={(e) => { e.stopPropagation(); onDelete(program); }}
+                className="flex-1"
+              >
+                Delete
+              </Button>
             )}
           </div>
         </div>

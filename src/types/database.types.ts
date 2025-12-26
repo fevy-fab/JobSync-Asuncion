@@ -2149,11 +2149,10 @@ export type Database = {
       training_program_status:
         | "active"
         | "upcoming"
+        | "ongoing"
         | "completed"
         | "cancelled"
         | "archived"
-        | "scheduled"
-        | "ongoing"
       user_role: "ADMIN" | "HR" | "PESO" | "APPLICANT"
       user_status: "active" | "inactive"
     }
@@ -2328,11 +2327,10 @@ export const Constants = {
       training_program_status: [
         "active",
         "upcoming",
+        "ongoing",
         "completed",
         "cancelled",
         "archived",
-        "scheduled",
-        "ongoing",
       ],
       user_role: ["ADMIN", "HR", "PESO", "APPLICANT"],
       user_status: ["active", "inactive"],
