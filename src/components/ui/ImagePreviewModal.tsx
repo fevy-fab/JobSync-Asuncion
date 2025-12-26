@@ -20,6 +20,9 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
+  // Track if this modal instance set the body overflow
+  const didSetOverflowRef = React.useRef(false);
+
   // Reset image loaded state when modal opens with new image
   useEffect(() => {
     if (isOpen && imageUrl) {
@@ -32,14 +35,26 @@ export const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
+      didSetOverflowRef.current = true;
     }
 
     return () => {
-      document.body.style.overflow = 'unset';
+      // Only restore scroll if this modal instance set it
+      if (didSetOverflowRef.current) {
+        document.body.style.overflow = '';
+        didSetOverflowRef.current = false;
+      }
     };
   }, [isOpen]);
+
+  // Cleanup on unmount - ensure scroll is always restored
+  useEffect(() => {
+    return () => {
+      if (didSetOverflowRef.current) {
+        document.body.style.overflow = '';
+      }
+    };
+  }, []);
 
   // Handle ESC key to close
   useEffect(() => {

@@ -20,6 +20,7 @@ export interface CertificateProgramData {
   end_date: string | null;
   skills_covered: string[] | null;
   location: string | null;
+  speaker_name: string | null;
 }
 
 export interface CertificateCompletionData {

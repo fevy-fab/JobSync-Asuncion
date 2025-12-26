@@ -35,11 +35,17 @@ export function Header() {
             <Link href="/#how-it-works" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
               How It Works
             </Link>
-            <Link href="/#about" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
-              About
+            <Link href="/jobs" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
+              Jobs
+            </Link>
+            <Link href="/trainings" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
+              Trainings
+            </Link>
+            <Link href="/announcements" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
+              Announcements
             </Link>
             <Link href="/login" className="text-gray-700 hover:text-[#22A555] transition-colors font-medium">
-              Admin Portal
+              Login
             </Link>
           </div>
 
@@ -84,6 +90,27 @@ export function Header() {
               How It Works
             </Link>
             <Link
+              href="/jobs"
+              className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Jobs
+            </Link>
+            <Link
+              href="/trainings"
+              className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Trainings
+            </Link>
+            <Link
+              href="/announcements"
+              className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Announcements
+            </Link>
+            <Link
               href="/#about"
               className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
               onClick={() => setMobileMenuOpen(false)}
@@ -95,7 +122,7 @@ export function Header() {
               className="block py-2 px-4 text-gray-700 hover:text-[#22A555] hover:bg-gray-50 rounded-lg transition-colors font-medium"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Admin Portal
+              Login
             </Link>
             <div className="pt-2">
               <Link href="/register" className="block" onClick={() => setMobileMenuOpen(false)}>

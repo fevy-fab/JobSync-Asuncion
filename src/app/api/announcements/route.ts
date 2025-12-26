@@ -23,6 +23,9 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status'); // active, archived
     const category = searchParams.get('category'); // general, job_opening, training, notice
 
+    // Check if this is a public request (status=active allows anonymous access)
+    const isPublicRequest = status === 'active' || !status;
+
     // Build query
     let query = supabase
       .from('announcements')
@@ -45,20 +48,22 @@ export async function GET(request: NextRequest) {
       `)
       .order('created_at', { ascending: false });
 
-    // Apply HR isolation: HR users can only see their own announcements
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
+    // Apply HR isolation only for authenticated requests
+    if (!isPublicRequest) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
 
-      // HR users can only see announcements they created
-      if (profile?.role === 'HR') {
-        query = query.eq('created_by', user.id);
+        // HR users can only see announcements they created
+        if (profile?.role === 'HR') {
+          query = query.eq('created_by', user.id);
+        }
+        // ADMIN can see all announcements (no additional filter)
       }
-      // ADMIN can see all announcements (no additional filter)
     }
 
     // Apply filters

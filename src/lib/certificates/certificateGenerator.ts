@@ -289,6 +289,12 @@ export async function generateCertificatePDF(
   doc.text(`held from ${startDate} to ${endDate}`, centerX, DATE_RANGE_Y, { align: 'center' });
   doc.text(`with a duration of ${data.program.duration}`, centerX, DURATION_Y, { align: 'center' });
 
+  // Speaker/Instructor name (if provided)
+  if (data.program.speaker_name) {
+    const SPEAKER_Y = DURATION_Y + 6;
+    doc.text(`facilitated by ${data.program.speaker_name}`, centerX, SPEAKER_Y, { align: 'center' });
+  }
+
   // ===== SKILLS SECTION =====
   if (data.program.skills_covered && data.program.skills_covered.length > 0) {
     doc.text('covering the following skills:', centerX, SKILLS_Y, { align: 'center' });

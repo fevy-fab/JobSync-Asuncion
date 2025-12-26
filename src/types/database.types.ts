@@ -801,6 +801,7 @@ export type Database = {
           location: string | null
           schedule: string | null
           skills_covered: string[] | null
+          speaker_name: string | null
           start_date: string
           status: Database["public"]["Enums"]["training_program_status"]
           title: string
@@ -819,6 +820,7 @@ export type Database = {
           location?: string | null
           schedule?: string | null
           skills_covered?: string[] | null
+          speaker_name?: string | null
           start_date: string
           status?: Database["public"]["Enums"]["training_program_status"]
           title: string
@@ -837,6 +839,7 @@ export type Database = {
           location?: string | null
           schedule?: string | null
           skills_covered?: string[] | null
+          speaker_name?: string | null
           start_date?: string
           status?: Database["public"]["Enums"]["training_program_status"]
           title?: string

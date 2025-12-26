@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
     const createdBy = searchParams.get('created_by'); // filter by creator
     const search = searchParams.get('search'); // search in title/description
 
+    // Check if this is a public request (status=active allows anonymous access)
+    const isPublicRequest = status === 'active';
+
     // Start query
     let query = supabase
       .from('jobs')
@@ -55,20 +58,22 @@ export async function GET(request: NextRequest) {
       `)
       .order('created_at', { ascending: false });
 
-    // Apply HR isolation: HR users can only see their own jobs
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
+    // Apply HR isolation only for authenticated requests
+    if (!isPublicRequest) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
 
-      // HR users can only see jobs they created
-      if (profile?.role === 'HR') {
-        query = query.eq('created_by', user.id);
+        // HR users can only see jobs they created
+        if (profile?.role === 'HR') {
+          query = query.eq('created_by', user.id);
+        }
+        // ADMIN can see all jobs (no additional filter)
       }
-      // ADMIN can see all jobs (no additional filter)
     }
 
     // Apply filters

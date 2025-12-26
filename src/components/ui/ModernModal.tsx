@@ -65,7 +65,10 @@ export const ModernModal: React.FC<ModernModalProps> = ({
     }
   };
 
-  // Handle ESC key
+  // Track if this modal instance set the body overflow
+  const didSetOverflowRef = React.useRef(false);
+
+  // Handle ESC key and body scroll locking
   React.useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -77,13 +80,27 @@ export const ModernModal: React.FC<ModernModalProps> = ({
       document.addEventListener('keydown', handleEsc);
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
+      didSetOverflowRef.current = true;
     }
 
     return () => {
       document.removeEventListener('keydown', handleEsc);
-      document.body.style.overflow = 'unset';
+      // Only restore scroll if this modal instance set it
+      if (didSetOverflowRef.current) {
+        document.body.style.overflow = '';
+        didSetOverflowRef.current = false;
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
+
+  // Cleanup on unmount - ensure scroll is always restored
+  React.useEffect(() => {
+    return () => {
+      if (didSetOverflowRef.current) {
+        document.body.style.overflow = '';
+      }
+    };
+  }, []);
 
   return (
     <div

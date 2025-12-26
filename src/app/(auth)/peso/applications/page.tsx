@@ -1508,30 +1508,38 @@ export default function PESOApplicationsPage() {
 
           {/* Applications Table */}
           <Card title="TRAINING APPLICATION LIST" headerColor="bg-[#D4F4DD]" variant="elevated" className="hover:shadow-xl transition-shadow">
-            <EnhancedTable
-              columns={columns}
-              data={filteredApplications}
-              searchable
-              paginated
-              pageSize={10}
-              searchPlaceholder="Search by name, email, training, or status..."
-            />
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-8 h-8 animate-spin text-[#22A555]" />
+                <span className="ml-3 text-gray-600">Loading applications...</span>
+              </div>
+            ) : (
+              <EnhancedTable
+                columns={columns}
+                data={filteredApplications}
+                searchable
+                paginated
+                pageSize={10}
+                searchPlaceholder="Search by name, email, training, or status..."
+              />
+            )}
           </Card>
         </div>
 
         {/* View Details Modal */}
-        <ModernModal
-          isOpen={viewModalOpen}
-          onClose={() => {
-            setViewModalOpen(false);
-            setSelectedApplication(null);
-          }}
-          title="Application Details"
-          subtitle="View training application information"
-          colorVariant="blue"
-          icon={FileText}
-          size="lg"
-        >
+        {viewModalOpen && (
+          <ModernModal
+            isOpen={viewModalOpen}
+            onClose={() => {
+              setViewModalOpen(false);
+              setSelectedApplication(null);
+            }}
+            title="Application Details"
+            subtitle="View training application information"
+            colorVariant="blue"
+            icon={FileText}
+            size="lg"
+          >
           {selectedApplication && (
             <div className="space-y-6">
               {/* Applicant Information */}
@@ -1654,22 +1662,24 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </ModernModal>
+          </ModernModal>
+        )}
 
         {/* Approve Confirmation Modal */}
-        <ModernModal
-          isOpen={approveModalOpen}
-          onClose={() => {
-            setApproveModalOpen(false);
-            setSelectedApplication(null);
-            setNextSteps('');
-          }}
-          title="Approve Application"
-          subtitle="Set next steps for applicant"
-          colorVariant="green"
-          icon={CheckCircle2}
-          size="md"
-        >
+        {approveModalOpen && (
+          <ModernModal
+            isOpen={approveModalOpen}
+            onClose={() => {
+              setApproveModalOpen(false);
+              setSelectedApplication(null);
+              setNextSteps('');
+            }}
+            title="Approve Application"
+            subtitle="Set next steps for applicant"
+            colorVariant="green"
+            icon={CheckCircle2}
+            size="md"
+          >
           {selectedApplication && (
             <div className="space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -1718,22 +1728,24 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </ModernModal>
+          </ModernModal>
+        )}
 
         {/* Deny Confirmation Modal */}
-        <ModernModal
-          isOpen={denyModalOpen}
-          onClose={() => {
-            setDenyModalOpen(false);
-            setSelectedApplication(null);
-            setDenialReason('');
-          }}
-          title="Deny Application"
-          subtitle="Provide reason for denial"
-          colorVariant="red"
-          icon={XCircle}
-          size="md"
-        >
+        {denyModalOpen && (
+          <ModernModal
+            isOpen={denyModalOpen}
+            onClose={() => {
+              setDenyModalOpen(false);
+              setSelectedApplication(null);
+              setDenialReason('');
+            }}
+            title="Deny Application"
+            subtitle="Provide reason for denial"
+            colorVariant="red"
+            icon={XCircle}
+            size="md"
+          >
           {selectedApplication && (
             <div className="space-y-4">
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -1782,21 +1794,23 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </ModernModal>
+          </ModernModal>
+        )}
 
         {/* Mark as Under Review Modal */}
-        <ModernModal
-          isOpen={underReviewModalOpen}
-          onClose={() => {
-            setUnderReviewModalOpen(false);
-            setSelectedApplication(null);
-          }}
-          title="Mark as Under Review"
-          subtitle="Update application status"
-          colorVariant="blue"
-          icon={Eye}
-          size="md"
-        >
+        {underReviewModalOpen && (
+          <ModernModal
+            isOpen={underReviewModalOpen}
+            onClose={() => {
+              setUnderReviewModalOpen(false);
+              setSelectedApplication(null);
+            }}
+            title="Mark as Under Review"
+            subtitle="Update application status"
+            colorVariant="blue"
+            icon={Eye}
+            size="md"
+          >
           {selectedApplication && (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -1832,121 +1846,127 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </ModernModal>
+          </ModernModal>
+        )}
 
         {/* Enroll Applicant Modal */}
-        <ModernModal
-          isOpen={enrollModalOpen}
-          onClose={() => {
-            setEnrollModalOpen(false);
-            setSelectedApplication(null);
-          }}
-          title="Enroll Applicant"
-          subtitle="Confirm enrollment in training program"
-          colorVariant="purple"
-          icon={UserCheck}
-          size="md"
-        >
-          {selectedApplication && (
-            <div className="space-y-4">
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                <p className="text-gray-700">
-                  Confirm enrollment of{' '}
-                  <span className="font-semibold">{selectedApplication.full_name}</span> in{' '}
-                  <span className="font-semibold">{selectedApplication.training_programs?.title}</span>?
-                </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  The applicant will be officially enrolled in the training program.
-                </p>
-              </div>
+        {enrollModalOpen && (
+          <ModernModal
+            isOpen={enrollModalOpen}
+            onClose={() => {
+              setEnrollModalOpen(false);
+              setSelectedApplication(null);
+            }}
+            title="Enroll Applicant"
+            subtitle="Confirm enrollment in training program"
+            colorVariant="purple"
+            icon={UserCheck}
+            size="md"
+          >
+            {selectedApplication && (
+              <div className="space-y-4">
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                  <p className="text-gray-700">
+                    Confirm enrollment of{' '}
+                    <span className="font-semibold">{selectedApplication.full_name}</span> in{' '}
+                    <span className="font-semibold">{selectedApplication.training_programs?.title}</span>?
+                  </p>
+                  <p className="text-sm text-gray-600 mt-2">
+                    The applicant will be officially enrolled in the training program.
+                  </p>
+                </div>
 
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setEnrollModalOpen(false);
-                    setSelectedApplication(null);
-                  }}
-                  disabled={actionLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  icon={UserCheck}
-                  onClick={handleEnroll}
-                  loading={actionLoading}
-                >
-                  Confirm Enrollment
-                </Button>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setEnrollModalOpen(false);
+                      setSelectedApplication(null);
+                    }}
+                    disabled={actionLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    icon={UserCheck}
+                    onClick={handleEnroll}
+                    loading={actionLoading}
+                  >
+                    Confirm Enrollment
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </ModernModal>
+            )}
+          </ModernModal>
+        )}
 
         {/* Mark as Completed Modal */}
-        <ModernModal
-          isOpen={completeModalOpen}
-          onClose={() => {
-            setCompleteModalOpen(false);
-            setSelectedApplication(null);
-          }}
-          title="Mark Training as Completed"
-          subtitle="Confirm training completion"
-          colorVariant="gray"
-          icon={CheckCircle}
-          size="md"
-        >
-          {selectedApplication && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                <p className="text-gray-700">
-                  Mark training as completed for{' '}
-                  <span className="font-semibold">{selectedApplication.full_name}</span>?
-                </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  This indicates the applicant has successfully finished the training program.
-                </p>
-              </div>
+        {completeModalOpen && (
+          <ModernModal
+            isOpen={completeModalOpen}
+            onClose={() => {
+              setCompleteModalOpen(false);
+              setSelectedApplication(null);
+            }}
+            title="Mark Training as Completed"
+            subtitle="Confirm training completion"
+            colorVariant="gray"
+            icon={CheckCircle}
+            size="md"
+          >
+            {selectedApplication && (
+              <div className="space-y-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <p className="text-gray-700">
+                    Mark training as completed for{' '}
+                    <span className="font-semibold">{selectedApplication.full_name}</span>?
+                  </p>
+                  <p className="text-sm text-gray-600 mt-2">
+                    This indicates the applicant has successfully finished the training program.
+                  </p>
+                </div>
 
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setCompleteModalOpen(false);
-                    setSelectedApplication(null);
-                  }}
-                  disabled={actionLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="secondary"
-                  icon={CheckCircle}
-                  onClick={handleComplete}
-                  loading={actionLoading}
-                >
-                  Mark as Completed
-                </Button>
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setCompleteModalOpen(false);
+                      setSelectedApplication(null);
+                    }}
+                    disabled={actionLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    icon={CheckCircle}
+                    onClick={handleComplete}
+                    loading={actionLoading}
+                  >
+                    Mark as Completed
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </ModernModal>
+            )}
+          </ModernModal>
+        )}
 
         {/* Issue Certificate Modal */}
-        <ModernModal
-          isOpen={certifyModalOpen}
-          onClose={() => {
-            setCertifyModalOpen(false);
-            setSelectedApplication(null);
-            setIncludeSignature(false);
-          }}
-          title="Generate Training Certificate"
-          subtitle="Preview and customize before issuing"
-          colorVariant="green"
-          icon={Award}
-          size="md"
-        >
+        {certifyModalOpen && (
+          <ModernModal
+            isOpen={certifyModalOpen}
+            onClose={() => {
+              setCertifyModalOpen(false);
+              setSelectedApplication(null);
+              setIncludeSignature(false);
+            }}
+            title="Generate Training Certificate"
+            subtitle="Preview and customize before issuing"
+            colorVariant="green"
+            icon={Award}
+            size="md"
+          >
           {selectedApplication && (
             <div className="space-y-4">
               {/* Certificate Details */}
@@ -2045,41 +2065,44 @@ export default function PESOApplicationsPage() {
               </div>
             </div>
           )}
-        </ModernModal>
+          </ModernModal>
+        )}
 
         {/* Status History Modal */}
-        <ModernModal
-          isOpen={historyModalOpen}
-          onClose={() => {
-            setHistoryModalOpen(false);
-            setSelectedApplication(null);
-          }}
-          title="Application Status History"
-          subtitle={selectedApplication ? `${selectedApplication.full_name} - ${selectedApplication.training_programs?.title || 'N/A'}` : ''}
-          colorVariant="blue"
-          icon={History}
-          size="xl"
-        >
-          {selectedApplication && (
-            <div className="space-y-6">
-              {/* Status Timeline */}
-              {selectedApplication.status_history && selectedApplication.status_history.length > 0 ? (
-                <StatusTimeline
-                  statusHistory={selectedApplication.status_history}
-                  currentStatus={selectedApplication.status}
-                />
-              ) : (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-                  <History className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-600 font-medium">No status history available</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    This application has not been processed yet.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </ModernModal>
+        {historyModalOpen && (
+          <ModernModal
+            isOpen={historyModalOpen}
+            onClose={() => {
+              setHistoryModalOpen(false);
+              setSelectedApplication(null);
+            }}
+            title="Application Status History"
+            subtitle={selectedApplication ? `${selectedApplication.full_name} - ${selectedApplication.training_programs?.title || 'N/A'}` : ''}
+            colorVariant="blue"
+            icon={History}
+            size="xl"
+          >
+            {selectedApplication && (
+              <div className="space-y-6">
+                {/* Status Timeline */}
+                {selectedApplication.status_history && selectedApplication.status_history.length > 0 ? (
+                  <StatusTimeline
+                    statusHistory={selectedApplication.status_history}
+                    currentStatus={selectedApplication.status}
+                  />
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                    <History className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                    <p className="text-gray-600 font-medium">No status history available</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      This application has not been processed yet.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </ModernModal>
+        )}
 
         {/* Mark Attendance Modal (Bulk Operation) */}
         {selectedProgramForBulk && (
@@ -2136,252 +2159,260 @@ export default function PESOApplicationsPage() {
         )}
 
         {/* Bulk Mark as Under Review Modal */}
-        <ModernModal
-          isOpen={bulkReviewModalOpen}
-          onClose={() => setBulkReviewModalOpen(false)}
-          title="Mark as Under Review"
-          subtitle={`Update ${getEligibleForReview().length} eligible application${getEligibleForReview().length !== 1 ? 's' : ''}`}
-          colorVariant="blue"
-          icon={Eye}
-          size="md"
-        >
-          <div className="space-y-4">
-            <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
-              <p className="text-sm text-blue-800">
-                Are you sure you want to mark <strong>{getEligibleForReview().length} application{getEligibleForReview().length !== 1 ? 's' : ''}</strong> as under review?
-                {selectedApplications.size > getEligibleForReview().length && (
-                  <span className="block mt-1 text-xs text-blue-700">
-                    Note: Only pending applications will be affected.
-                  </span>
-                )}
-              </p>
-            </div>
+        {bulkReviewModalOpen && (
+          <ModernModal
+            isOpen={bulkReviewModalOpen}
+            onClose={() => setBulkReviewModalOpen(false)}
+            title="Mark as Under Review"
+            subtitle={`Update ${getEligibleForReview().length} eligible application${getEligibleForReview().length !== 1 ? 's' : ''}`}
+            colorVariant="blue"
+            icon={Eye}
+            size="md"
+          >
+            <div className="space-y-4">
+              <div className="bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
+                <p className="text-sm text-blue-800">
+                  Are you sure you want to mark <strong>{getEligibleForReview().length} application{getEligibleForReview().length !== 1 ? 's' : ''}</strong> as under review?
+                  {selectedApplications.size > getEligibleForReview().length && (
+                    <span className="block mt-1 text-xs text-blue-700">
+                      Note: Only pending applications will be affected.
+                    </span>
+                  )}
+                </p>
+              </div>
 
-            <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Pending):</p>
-              <ul className="text-sm text-gray-600 space-y-1">
-                {getEligibleForReview().map(app => (
-                  <li key={app.id} className="flex items-center gap-2">
-                    <User className="w-3 h-3" />
-                    {app.full_name}
-                  </li>
-                ))}
-              </ul>
-            </div>
+              <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
+                <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Pending):</p>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  {getEligibleForReview().map(app => (
+                    <li key={app.id} className="flex items-center gap-2">
+                      <User className="w-3 h-3" />
+                      {app.full_name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="secondary"
-                onClick={() => setBulkReviewModalOpen(false)}
-                className="flex-1"
-                disabled={bulkActionLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                icon={Eye}
-                loading={bulkActionLoading}
-                onClick={handleBulkReview}
-                className="flex-1"
-              >
-                {bulkActionLoading ? 'Updating...' : 'Confirm'}
-              </Button>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setBulkReviewModalOpen(false)}
+                  className="flex-1"
+                  disabled={bulkActionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={Eye}
+                  loading={bulkActionLoading}
+                  onClick={handleBulkReview}
+                  className="flex-1"
+                >
+                  {bulkActionLoading ? 'Updating...' : 'Confirm'}
+                </Button>
+              </div>
             </div>
-          </div>
-        </ModernModal>
+          </ModernModal>
+        )}
 
         {/* Bulk Approve Modal */}
-        <ModernModal
-          isOpen={bulkApproveModalOpen}
-          onClose={() => setBulkApproveModalOpen(false)}
-          title="Approve Applications"
-          subtitle={`Approve ${getEligibleForApprove().length} eligible application${getEligibleForApprove().length !== 1 ? 's' : ''}`}
-          colorVariant="green"
-          icon={CheckCircle}
-          size="md"
-        >
-          <div className="space-y-4">
-            <div className="bg-green-50 border-l-4 border-green-600 p-4 rounded">
-              <p className="text-sm text-green-800">
-                Approve <strong>{getEligibleForApprove().length} application{getEligibleForApprove().length !== 1 ? 's' : ''}</strong> and notify applicants.
-                {selectedApplications.size > getEligibleForApprove().length && (
-                  <span className="block mt-1 text-xs text-green-700">
-                    Note: Only applications under review will be approved.
-                  </span>
-                )}
-              </p>
-            </div>
+        {bulkApproveModalOpen && (
+          <ModernModal
+            isOpen={bulkApproveModalOpen}
+            onClose={() => setBulkApproveModalOpen(false)}
+            title="Approve Applications"
+            subtitle={`Approve ${getEligibleForApprove().length} eligible application${getEligibleForApprove().length !== 1 ? 's' : ''}`}
+            colorVariant="green"
+            icon={CheckCircle}
+            size="md"
+          >
+            <div className="space-y-4">
+              <div className="bg-green-50 border-l-4 border-green-600 p-4 rounded">
+                <p className="text-sm text-green-800">
+                  Approve <strong>{getEligibleForApprove().length} application{getEligibleForApprove().length !== 1 ? 's' : ''}</strong> and notify applicants.
+                  {selectedApplications.size > getEligibleForApprove().length && (
+                    <span className="block mt-1 text-xs text-green-700">
+                      Note: Only applications under review will be approved.
+                    </span>
+                  )}
+                </p>
+              </div>
 
-            <div className="bg-blue-50 border border-blue-200 p-3 rounded">
-              <p className="text-sm text-blue-800">
-                <strong>Standard notification message will be sent:</strong>
-              </p>
-              <p className="text-xs text-blue-700 mt-1 italic">
-                "Your application has been approved. We will contact you soon with the next steps."
-              </p>
-              <p className="text-xs text-blue-600 mt-2">
-                💡 Need a custom message? Update applications individually instead.
-              </p>
-            </div>
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+                <p className="text-sm text-blue-800">
+                  <strong>Standard notification message will be sent:</strong>
+                </p>
+                <p className="text-xs text-blue-700 mt-1 italic">
+                  "Your application has been approved. We will contact you soon with the next steps."
+                </p>
+                <p className="text-xs text-blue-600 mt-2">
+                  💡 Need a custom message? Update applications individually instead.
+                </p>
+              </div>
 
-            <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Under Review):</p>
-              <ul className="text-sm text-gray-600 space-y-1">
-                {getEligibleForApprove().map(app => (
-                  <li key={app.id} className="flex items-center gap-2">
-                    <User className="w-3 h-3" />
-                    {app.full_name}
-                  </li>
-                ))}
-              </ul>
-            </div>
+              <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
+                <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Under Review):</p>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  {getEligibleForApprove().map(app => (
+                    <li key={app.id} className="flex items-center gap-2">
+                      <User className="w-3 h-3" />
+                      {app.full_name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="secondary"
-                onClick={() => setBulkApproveModalOpen(false)}
-                className="flex-1"
-                disabled={bulkActionLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="success"
-                icon={CheckCircle}
-                loading={bulkActionLoading}
-                onClick={() => handleBulkApprove()}
-                className="flex-1"
-              >
-                {bulkActionLoading ? 'Approving...' : 'Approve All'}
-              </Button>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setBulkApproveModalOpen(false)}
+                  className="flex-1"
+                  disabled={bulkActionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="success"
+                  icon={CheckCircle}
+                  loading={bulkActionLoading}
+                  onClick={() => handleBulkApprove()}
+                  className="flex-1"
+                >
+                  {bulkActionLoading ? 'Approving...' : 'Approve All'}
+                </Button>
+              </div>
             </div>
-          </div>
-        </ModernModal>
+          </ModernModal>
+        )}
 
         {/* Bulk Deny Modal */}
-        <ModernModal
-          isOpen={bulkDenyModalOpen}
-          onClose={() => setBulkDenyModalOpen(false)}
-          title="Deny Applications"
-          subtitle={`Deny ${getEligibleForDeny().length} eligible application${getEligibleForDeny().length !== 1 ? 's' : ''}`}
-          colorVariant="red"
-          icon={XCircle}
-          size="md"
-        >
-          <div className="space-y-4">
-            <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded">
-              <p className="text-sm text-red-800">
-                Deny <strong>{getEligibleForDeny().length} application{getEligibleForDeny().length !== 1 ? 's' : ''}</strong> and notify applicants.
-                {selectedApplications.size > getEligibleForDeny().length && (
-                  <span className="block mt-1 text-xs text-red-700">
-                    Note: Only pending or under review applications will be denied.
-                  </span>
-                )}
-              </p>
-            </div>
+        {bulkDenyModalOpen && (
+          <ModernModal
+            isOpen={bulkDenyModalOpen}
+            onClose={() => setBulkDenyModalOpen(false)}
+            title="Deny Applications"
+            subtitle={`Deny ${getEligibleForDeny().length} eligible application${getEligibleForDeny().length !== 1 ? 's' : ''}`}
+            colorVariant="red"
+            icon={XCircle}
+            size="md"
+          >
+            <div className="space-y-4">
+              <div className="bg-red-50 border-l-4 border-red-600 p-4 rounded">
+                <p className="text-sm text-red-800">
+                  Deny <strong>{getEligibleForDeny().length} application{getEligibleForDeny().length !== 1 ? 's' : ''}</strong> and notify applicants.
+                  {selectedApplications.size > getEligibleForDeny().length && (
+                    <span className="block mt-1 text-xs text-red-700">
+                      Note: Only pending or under review applications will be denied.
+                    </span>
+                  )}
+                </p>
+              </div>
 
-            <div className="bg-blue-50 border border-blue-200 p-3 rounded">
-              <p className="text-sm text-blue-800">
-                <strong>Standard notification message will be sent:</strong>
-              </p>
-              <p className="text-xs text-blue-700 mt-1 italic">
-                "Your application was reviewed. Please check your application details for more information. We encourage you to apply again in the future."
-              </p>
-              <p className="text-xs text-blue-600 mt-2">
-                💡 Need a specific denial reason? Update applications individually instead.
-              </p>
-            </div>
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded">
+                <p className="text-sm text-blue-800">
+                  <strong>Standard notification message will be sent:</strong>
+                </p>
+                <p className="text-xs text-blue-700 mt-1 italic">
+                  "Your application was reviewed. Please check your application details for more information. We encourage you to apply again in the future."
+                </p>
+                <p className="text-xs text-blue-600 mt-2">
+                  💡 Need a specific denial reason? Update applications individually instead.
+                </p>
+              </div>
 
-            <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Pending/Under Review):</p>
-              <ul className="text-sm text-gray-600 space-y-1">
-                {getEligibleForDeny().map(app => (
-                  <li key={app.id} className="flex items-center gap-2">
-                    <User className="w-3 h-3" />
-                    {app.full_name}
-                  </li>
-                ))}
-              </ul>
-            </div>
+              <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
+                <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Pending/Under Review):</p>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  {getEligibleForDeny().map(app => (
+                    <li key={app.id} className="flex items-center gap-2">
+                      <User className="w-3 h-3" />
+                      {app.full_name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="secondary"
-                onClick={() => setBulkDenyModalOpen(false)}
-                className="flex-1"
-                disabled={bulkActionLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                icon={XCircle}
-                loading={bulkActionLoading}
-                onClick={() => handleBulkDeny()}
-                className="flex-1"
-              >
-                {bulkActionLoading ? 'Denying...' : 'Deny All'}
-              </Button>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setBulkDenyModalOpen(false)}
+                  className="flex-1"
+                  disabled={bulkActionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  icon={XCircle}
+                  loading={bulkActionLoading}
+                  onClick={() => handleBulkDeny()}
+                  className="flex-1"
+                >
+                  {bulkActionLoading ? 'Denying...' : 'Deny All'}
+                </Button>
+              </div>
             </div>
-          </div>
-        </ModernModal>
+          </ModernModal>
+        )}
 
         {/* Bulk Enroll Modal */}
-        <ModernModal
-          isOpen={bulkEnrollModalOpen}
-          onClose={() => setBulkEnrollModalOpen(false)}
-          title="Enroll Applicants"
-          subtitle={`Enroll ${getEligibleForEnroll().length} eligible applicant${getEligibleForEnroll().length !== 1 ? 's' : ''}`}
-          colorVariant="teal"
-          icon={UserCheck}
-          size="md"
-        >
-          <div className="space-y-4">
-            <div className="bg-teal-50 border-l-4 border-teal-600 p-4 rounded">
-              <p className="text-sm text-teal-800">
-                Enroll <strong>{getEligibleForEnroll().length} applicant{getEligibleForEnroll().length !== 1 ? 's' : ''}</strong> in their selected training programs.
-                {selectedApplications.size > getEligibleForEnroll().length && (
-                  <span className="block mt-1 text-xs text-teal-700">
-                    Note: Only approved applications will be enrolled.
-                  </span>
-                )}
-              </p>
-            </div>
+        {bulkEnrollModalOpen && (
+          <ModernModal
+            isOpen={bulkEnrollModalOpen}
+            onClose={() => setBulkEnrollModalOpen(false)}
+            title="Enroll Applicants"
+            subtitle={`Enroll ${getEligibleForEnroll().length} eligible applicant${getEligibleForEnroll().length !== 1 ? 's' : ''}`}
+            colorVariant="teal"
+            icon={UserCheck}
+            size="md"
+          >
+            <div className="space-y-4">
+              <div className="bg-teal-50 border-l-4 border-teal-600 p-4 rounded">
+                <p className="text-sm text-teal-800">
+                  Enroll <strong>{getEligibleForEnroll().length} applicant{getEligibleForEnroll().length !== 1 ? 's' : ''}</strong> in their selected training programs.
+                  {selectedApplications.size > getEligibleForEnroll().length && (
+                    <span className="block mt-1 text-xs text-teal-700">
+                      Note: Only approved applications will be enrolled.
+                    </span>
+                  )}
+                </p>
+              </div>
 
-            <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
-              <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Approved):</p>
-              <ul className="text-sm text-gray-600 space-y-1">
-                {getEligibleForEnroll().map(app => (
-                  <li key={app.id} className="flex items-center gap-2">
-                    <User className="w-3 h-3" />
-                    {app.full_name} - {app.training_programs?.title}
-                  </li>
-                ))}
-              </ul>
-            </div>
+              <div className="bg-gray-50 p-3 rounded max-h-48 overflow-y-auto">
+                <p className="text-sm font-medium text-gray-700 mb-2">Eligible Applicants (Approved):</p>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  {getEligibleForEnroll().map(app => (
+                    <li key={app.id} className="flex items-center gap-2">
+                      <User className="w-3 h-3" />
+                      {app.full_name} - {app.training_programs?.title}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="secondary"
-                onClick={() => setBulkEnrollModalOpen(false)}
-                className="flex-1"
-                disabled={bulkActionLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="teal"
-                icon={UserCheck}
-                loading={bulkActionLoading}
-                onClick={handleBulkEnroll}
-                className="flex-1"
-              >
-                {bulkActionLoading ? 'Enrolling...' : 'Enroll All'}
-              </Button>
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setBulkEnrollModalOpen(false)}
+                  className="flex-1"
+                  disabled={bulkActionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="teal"
+                  icon={UserCheck}
+                  loading={bulkActionLoading}
+                  onClick={handleBulkEnroll}
+                  className="flex-1"
+                >
+                  {bulkActionLoading ? 'Enrolling...' : 'Enroll All'}
+                </Button>
+              </div>
             </div>
-          </div>
-        </ModernModal>
+          </ModernModal>
+        )}
 
       </Container>
 

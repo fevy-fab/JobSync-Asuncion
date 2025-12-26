@@ -23,28 +23,36 @@ export async function GET(request: NextRequest) {
     // Optional filters
     const status = searchParams.get('status'); // active, completed, cancelled
 
-    // Get current user and their role for multi-tenancy filtering
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Check if this is a public request (status=active allows anonymous access)
+    const isPublicRequest = status === 'active' || status === 'upcoming';
 
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - Please login' },
-        { status: 401 }
-      );
-    }
+    // For non-public requests, require authentication
+    let profile = null;
+    if (!isPublicRequest) {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    // Get user profile to check role
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
+      if (authError || !user) {
+        return NextResponse.json(
+          { success: false, error: 'Unauthorized - Please login' },
+          { status: 401 }
+        );
+      }
 
-    if (profileError || !profile) {
-      return NextResponse.json(
-        { success: false, error: 'Profile not found' },
-        { status: 404 }
-      );
+      // Get user profile to check role
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !userProfile) {
+        return NextResponse.json(
+          { success: false, error: 'Profile not found' },
+          { status: 404 }
+        );
+      }
+
+      profile = userProfile;
     }
 
     // Build query
@@ -59,6 +67,7 @@ export async function GET(request: NextRequest) {
         capacity,
         enrolled_count,
         location,
+        speaker_name,
         start_date,
         end_date,
         skills_covered,
@@ -75,14 +84,15 @@ export async function GET(request: NextRequest) {
       `)
       .order('created_at', { ascending: false });
 
-    // Apply role-based filtering (multi-tenancy)
-    if (profile.role === 'PESO') {
+    // Apply role-based filtering (multi-tenancy) only for authenticated users
+    if (profile && profile.role === 'PESO') {
       // PESO users can only see programs they created
-      query = query.eq('created_by', user.id);
-    } else if (profile.role === 'APPLICANT') {
-      // Applicants can view all active programs (public)
-      // No created_by filter needed, but status filter will be applied below
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        query = query.eq('created_by', user.id);
+      }
     }
+    // APPLICANT can view all active programs (public)
     // ADMIN can see all programs (no additional filter)
 
     // Apply status filter
@@ -158,7 +168,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Validate required fields
-    const { title, description, duration, capacity, start_date, schedule, location, skills_covered, icon } = body;
+    const { title, description, duration, capacity, start_date, schedule, location, speaker_name, skills_covered, icon } = body;
 
     if (!title || !description || !duration || !capacity || !start_date) {
       return NextResponse.json(
@@ -187,6 +197,7 @@ export async function POST(request: NextRequest) {
         capacity: capacityNum,
         enrolled_count: 0,
         location: location || null,
+        speaker_name: speaker_name || null,
         start_date,
         end_date: body.end_date || null,
         skills_covered: skills_covered || [],
@@ -203,6 +214,7 @@ export async function POST(request: NextRequest) {
         capacity,
         enrolled_count,
         location,
+        speaker_name,
         start_date,
         end_date,
         skills_covered,

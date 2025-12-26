@@ -1,11 +1,13 @@
 'use client';
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
-import { Card, EnhancedTable, Button, Input, Textarea, Container, Badge, RefreshButton, ModernModal } from '@/components/ui';
+import { Card, Button, Input, Textarea, Container, Badge, RefreshButton, ModernModal } from '@/components/ui';
+import { ProgramCard } from '@/components/peso/ProgramCard';
+import { ProgramDetailsModal } from '@/components/peso/ProgramDetailsModal';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Edit, Trash2, GraduationCap, FileText, Clock, Users, Calendar, X, CheckCircle2, AlertCircle, Briefcase, Archive, Loader2, Filter, Undo2 } from 'lucide-react';
+import { Plus, Edit, Trash2, GraduationCap, Clock, Users, CheckCircle2, Archive, Loader2, Filter, Undo2, Search, Briefcase } from 'lucide-react';
 
 interface TrainingProgram {
   id: string;
@@ -16,6 +18,7 @@ interface TrainingProgram {
   capacity: number;
   enrolled_count: number;
   location?: string;
+  speaker_name?: string;
   start_date: string;
   end_date?: string;
   skills_covered?: string[];
@@ -36,6 +39,7 @@ export default function PESOProgramsPage() {
   const [programs, setPrograms] = useState<TrainingProgram[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 //  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'upcoming' | 'completed' | 'cancelled' | 'archived'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'upcoming' | 'archived'>('all');
 
@@ -44,11 +48,13 @@ export default function PESOProgramsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const [editingProgram, setEditingProgram] = useState<TrainingProgram | null>(null);
   const [deletingProgram, setDeletingProgram] = useState<TrainingProgram | null>(null);
   const [archivingProgram, setArchivingProgram] = useState<TrainingProgram | null>(null);
   const [restoringProgram, setRestoringProgram] = useState<TrainingProgram | null>(null);
+  const [previewProgram, setPreviewProgram] = useState<TrainingProgram | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -57,6 +63,7 @@ export default function PESOProgramsPage() {
     schedule: '',
     capacity: '',
     location: '',
+    speaker_name: '',
     start_date: '',
     end_date: '',
     skills_covered: '',
@@ -95,6 +102,7 @@ export default function PESOProgramsPage() {
       schedule: '',
       capacity: '',
       location: '',
+      speaker_name: '',
       start_date: '',
       end_date: '',
       skills_covered: '',
@@ -154,6 +162,7 @@ export default function PESOProgramsPage() {
       schedule: program.schedule || '',
       capacity: program.capacity.toString(),
       location: program.location || '',
+      speaker_name: program.speaker_name || '',
       start_date: program.start_date,
       end_date: program.end_date || '',
       skills_covered: program.skills_covered?.join(', ') || '',
@@ -313,6 +322,12 @@ export default function PESOProgramsPage() {
     }
   };
 
+  // Handle view program details
+  const handleView = (program: TrainingProgram) => {
+    setPreviewProgram(program);
+    setShowPreviewModal(true);
+  };
+
   // Calculate stats
   const stats = {
     total: programs.length,
@@ -325,130 +340,26 @@ export default function PESOProgramsPage() {
     totalCapacity: programs.reduce((sum, p) => sum + p.capacity, 0),
   };
 
-  // Filter programs by status
+  // Filter programs by status and search query
   const filteredPrograms = programs.filter(p => {
-    if (statusFilter === 'all') return true;
-    return p.status === statusFilter;
+    // Status filter
+    if (statusFilter !== 'all' && p.status !== statusFilter) return false;
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        p.title.toLowerCase().includes(query) ||
+        p.description.toLowerCase().includes(query) ||
+        p.location?.toLowerCase().includes(query) ||
+        p.speaker_name?.toLowerCase().includes(query) ||
+        p.skills_covered?.some(skill => skill.toLowerCase().includes(query))
+      );
+    }
+
+    return true;
   });
 
-  // Helper function to get program status badge configuration
-  const getProgramStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return { variant: 'success' as const, icon: CheckCircle2, label: 'Active' };
-      case 'upcoming':
-        return { variant: 'info' as const, icon: Clock, label: 'Upcoming' };
-//      case 'completed':
-//        return { variant: 'secondary' as const, icon: Archive, label: 'Completed' };
-//      case 'cancelled':
-//        return { variant: 'danger' as const, icon: X, label: 'Cancelled' };
-      case 'archived':
-        return { variant: 'secondary' as const, icon: Archive, label: 'Completed' };
-      default:
-        return { variant: 'secondary' as const, icon: AlertCircle, label: status };
-    }
-  };
-
-  // Table columns
-  const columns = [
-    {
-      header: 'Program Name',
-      accessor: 'title' as const,
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <GraduationCap className="w-4 h-4 text-[#22A555]" />
-          <span className="font-medium text-gray-900">{value}</span>
-        </div>
-      )
-    },
-    {
-      header: 'Description',
-      accessor: 'description' as const,
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <FileText className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-700 line-clamp-2">{value}</span>
-        </div>
-      )
-    },
-    {
-      header: 'Duration',
-      accessor: 'duration' as const,
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-700">{value}</span>
-        </div>
-      )
-    },
-    {
-      header: 'Capacity',
-      accessor: 'capacity' as const,
-      render: (value: number, row: TrainingProgram) => (
-        <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-700">{row.enrolled_count} / {value}</span>
-        </div>
-      )
-    },
-    {
-      header: 'Start Date',
-      accessor: 'start_date' as const,
-      render: (value: string) => (
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-gray-400" />
-          <span className="text-sm text-gray-700">{new Date(value).toLocaleDateString()}</span>
-        </div>
-      )
-    },
-    {
-      header: 'Status',
-      accessor: 'status' as const,
-      render: (value: string) => {
-        const statusBadge = getProgramStatusBadge(value);
-        return (
-          <Badge variant={statusBadge.variant} icon={statusBadge.icon}>
-            {statusBadge.label}
-          </Badge>
-        );
-      }
-    },
-    {
-      header: 'Actions',
-      accessor: 'id' as const,
-      render: (_: string, row: TrainingProgram) => {
-        const isArchived = row.status === 'archived';
-
-        return (
-          <div className="flex gap-2 flex-wrap">
-            {/* Non-archived programs: Edit + Archive */}
-            {!isArchived && (
-              <>
-                <Button variant="warning" size="sm" icon={Edit} onClick={() => handleEdit(row)}>
-                  Edit
-                </Button>
-                <Button variant="secondary" size="sm" icon={Archive} onClick={() => handleArchiveClick(row)}>
-                  Complete
-                </Button>
-              </>
-            )}
-
-            {/* Archived programs: Restore + Delete */}
-            {isArchived && (
-              <>
-                <Button variant="success" size="sm" icon={Undo2} onClick={() => handleRestoreClick(row)}>
-                  Restore
-                </Button>
-                <Button variant="danger" size="sm" icon={Trash2} onClick={() => handleDeleteClick(row)}>
-                  Delete
-                </Button>
-              </>
-            )}
-          </div>
-        );
-      }
-    },
-  ];
 
   return (
     <AdminLayout
@@ -571,259 +482,334 @@ export default function PESOProgramsPage() {
           </div>
         </div>
 
-        {/* Programs Table */}
-        <Card title="TRAINING PROGRAMS" headerColor="bg-[#D4F4DD]" variant="elevated" className="hover:shadow-xl transition-shadow">
-          <EnhancedTable
-            data={filteredPrograms}
-            columns={columns}
-            searchable={true}
-            paginated={true}
-            pageSize={10}
-            searchPlaceholder="Search programs..."
-          />
-        </Card>
+        {/* Search Bar */}
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search programs by title, description, location, speaker, or skills..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 w-full"
+              />
+            </div>
+            {searchQuery && (
+              <Button variant="secondary" size="sm" onClick={() => setSearchQuery('')}>
+                Clear
+              </Button>
+            )}
+          </div>
+          {searchQuery && (
+            <div className="mt-3 text-sm text-gray-600">
+              Showing {filteredPrograms.length} of {programs.length} programs
+            </div>
+          )}
+        </div>
+
+        {/* Programs Grid */}
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-8 h-8 animate-spin text-[#22A555]" />
+            <span className="ml-3 text-gray-600">Loading programs...</span>
+          </div>
+        ) : filteredPrograms.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-lg shadow-sm">
+            <GraduationCap className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No programs found</h3>
+            <p className="text-gray-600 mb-6">
+              {searchQuery
+                ? `No programs match "${searchQuery}"`
+                : statusFilter === 'all'
+                ? 'Create your first training program to get started'
+                : `No ${statusFilter} programs available`}
+            </p>
+            {!searchQuery && statusFilter === 'all' && (
+              <Button variant="primary" icon={Plus} onClick={() => setShowAddModal(true)}>
+                Add New Program
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredPrograms.map((program) => (
+              <ProgramCard
+                key={program.id}
+                program={program}
+                onView={handleView}
+                onEdit={handleEdit}
+                onArchive={handleArchiveClick}
+                onRestore={handleRestoreClick}
+                onDelete={handleDeleteClick}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Add Program Modal */}
-        <ModernModal
-          isOpen={showAddModal}
-          onClose={() => { setShowAddModal(false); resetForm(); }}
-          title="Create Training Program"
-          subtitle="Add a new job training program"
-          colorVariant="green"
-          icon={GraduationCap}
-          size="lg"
-        >
-          <form onSubmit={handleCreate} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Program Title *</label>
-                  <Input
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g., Web Development Training"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Description *</label>
-                  <Textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Describe the training program..."
-                    rows={4}
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+        {showAddModal && (
+          <ModernModal
+            isOpen={showAddModal}
+            onClose={() => { setShowAddModal(false); resetForm(); }}
+            title="Create Training Program"
+            subtitle="Add a new job training program"
+            colorVariant="green"
+            icon={GraduationCap}
+            size="lg"
+          >
+            <form onSubmit={handleCreate} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Duration *</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Program Title *</label>
                     <Input
-                      value={formData.duration}
-                      onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                      placeholder="e.g., 3 months"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="e.g., Web Development Training"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Capacity *</label>
-                    <Input
-                      type="number"
-                      value={formData.capacity}
-                      onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                      placeholder="e.g., 25"
-                      min="1"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Start Date *</label>
-                    <Input
-                      type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Description *</label>
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Describe the training program..."
+                      rows={4}
                       required
                     />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Duration *</label>
+                      <Input
+                        value={formData.duration}
+                        onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                        placeholder="e.g., 3 months"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Capacity *</label>
+                      <Input
+                        type="number"
+                        value={formData.capacity}
+                        onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                        placeholder="e.g., 25"
+                        min="1"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Start Date *</label>
+                      <Input
+                        type="date"
+                        value={formData.start_date}
+                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">End Date</label>
+                      <Input
+                        type="date"
+                        value={formData.end_date}
+                        onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">End Date</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Schedule</label>
                     <Input
-                      type="date"
-                      value={formData.end_date}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      value={formData.schedule}
+                      onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
+                      placeholder="e.g., Mon-Fri, 9:00 AM - 5:00 PM"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Schedule</label>
-                  <Input
-                    value={formData.schedule}
-                    onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
-                    placeholder="e.g., Mon-Fri, 9:00 AM - 5:00 PM"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Location</label>
+                    <Input
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      placeholder="e.g., PESO Training Center"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Location</label>
-                  <Input
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder="e.g., PESO Training Center"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Speaker/Instructor Name</label>
+                    <Input
+                      value={formData.speaker_name}
+                      onChange={(e) => setFormData({ ...formData, speaker_name: e.target.value })}
+                      placeholder="e.g., Dr. Juan Dela Cruz"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Skills Covered</label>
-                  <Input
-                    value={formData.skills_covered}
-                    onChange={(e) => setFormData({ ...formData, skills_covered: e.target.value })}
-                    placeholder="e.g., HTML, CSS, JavaScript (comma-separated)"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Skills Covered</label>
+                    <Input
+                      value={formData.skills_covered}
+                      onChange={(e) => setFormData({ ...formData, skills_covered: e.target.value })}
+                      placeholder="e.g., HTML, CSS, JavaScript (comma-separated)"
+                    />
+                  </div>
 
-                <div className="flex gap-3 pt-4">
-                  <Button type="button" variant="secondary" onClick={() => { setShowAddModal(false); resetForm(); }} className="flex-1">
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="primary" icon={CheckCircle2} loading={submitting} className="flex-1">
-                    {submitting ? 'Creating...' : 'Create Program'}
-                  </Button>
-                </div>
-              </form>
-        </ModernModal>
+                  <div className="flex gap-3 pt-4">
+                    <Button type="button" variant="secondary" onClick={() => { setShowAddModal(false); resetForm(); }} className="flex-1">
+                      Cancel
+                    </Button>
+                    <Button type="submit" variant="primary" icon={CheckCircle2} loading={submitting} className="flex-1">
+                      {submitting ? 'Creating...' : 'Create Program'}
+                    </Button>
+                  </div>
+                </form>
+          </ModernModal>
+        )}
 
         {/* Edit Program Modal */}
-        <ModernModal
-          isOpen={showEditModal && editingProgram !== null}
-          onClose={() => { setShowEditModal(false); setEditingProgram(null); resetForm(); }}
-          title="Edit Training Program"
-          subtitle="Update program details"
-          colorVariant="orange"
-          icon={Edit}
-          size="lg"
-        >
-          <form onSubmit={handleUpdate} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Program Title *</label>
-                  <Input
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g., Web Development Training"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Description *</label>
-                  <Textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Describe the training program..."
-                    rows={4}
-                    required
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+        {editingProgram && (
+          <ModernModal
+            isOpen={showEditModal}
+            onClose={() => { setShowEditModal(false); setEditingProgram(null); resetForm(); }}
+            title="Edit Training Program"
+            subtitle="Update program details"
+            colorVariant="orange"
+            icon={Edit}
+            size="lg"
+          >
+            <form onSubmit={handleUpdate} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Duration *</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Program Title *</label>
                     <Input
-                      value={formData.duration}
-                      onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
-                      placeholder="e.g., 3 months"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="e.g., Web Development Training"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Capacity *</label>
-                    <Input
-                      type="number"
-                      value={formData.capacity}
-                      onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
-                      placeholder="e.g., 25"
-                      min="1"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">Start Date *</label>
-                    <Input
-                      type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Description *</label>
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Describe the training program..."
+                      rows={4}
                       required
                     />
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Duration *</label>
+                      <Input
+                        value={formData.duration}
+                        onChange={(e) => setFormData({ ...formData, duration: e.target.value })}
+                        placeholder="e.g., 3 months"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Capacity *</label>
+                      <Input
+                        type="number"
+                        value={formData.capacity}
+                        onChange={(e) => setFormData({ ...formData, capacity: e.target.value })}
+                        placeholder="e.g., 25"
+                        min="1"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">Start Date *</label>
+                      <Input
+                        type="date"
+                        value={formData.start_date}
+                        onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-900 mb-2">End Date</label>
+                      <Input
+                        type="date"
+                        value={formData.end_date}
+                        onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label className="block text-sm font-medium text-gray-900 mb-2">End Date</label>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Schedule</label>
                     <Input
-                      type="date"
-                      value={formData.end_date}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                      value={formData.schedule}
+                      onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
+                      placeholder="e.g., Mon-Fri, 9:00 AM - 5:00 PM"
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Schedule</label>
-                  <Input
-                    value={formData.schedule}
-                    onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
-                    placeholder="e.g., Mon-Fri, 9:00 AM - 5:00 PM"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Location</label>
+                    <Input
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      placeholder="e.g., PESO Training Center"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Location</label>
-                  <Input
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder="e.g., PESO Training Center"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Speaker/Instructor Name</label>
+                    <Input
+                      value={formData.speaker_name}
+                      onChange={(e) => setFormData({ ...formData, speaker_name: e.target.value })}
+                      placeholder="e.g., Dr. Juan Dela Cruz"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Skills Covered</label>
-                  <Input
-                    value={formData.skills_covered}
-                    onChange={(e) => setFormData({ ...formData, skills_covered: e.target.value })}
-                    placeholder="e.g., HTML, CSS, JavaScript (comma-separated)"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-2">Skills Covered</label>
+                    <Input
+                      value={formData.skills_covered}
+                      onChange={(e) => setFormData({ ...formData, skills_covered: e.target.value })}
+                      placeholder="e.g., HTML, CSS, JavaScript (comma-separated)"
+                    />
+                  </div>
 
-                <div className="flex gap-3 pt-4">
-                  <Button type="button" variant="secondary" onClick={() => { setShowEditModal(false); setEditingProgram(null); resetForm(); }} className="flex-1">
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="warning" icon={CheckCircle2} loading={submitting} className="flex-1">
-                    {submitting ? 'Updating...' : 'Update Program'}
-                  </Button>
-                </div>
-              </form>
-        </ModernModal>
+                  <div className="flex gap-3 pt-4">
+                    <Button type="button" variant="secondary" onClick={() => { setShowEditModal(false); setEditingProgram(null); resetForm(); }} className="flex-1">
+                      Cancel
+                    </Button>
+                    <Button type="submit" variant="warning" icon={CheckCircle2} loading={submitting} className="flex-1">
+                      {submitting ? 'Updating...' : 'Update Program'}
+                    </Button>
+                  </div>
+                </form>
+          </ModernModal>
+        )}
 
         {/* Archive Confirmation Modal */}
-        <ModernModal
-          isOpen={showArchiveConfirm && archivingProgram !== null}
-          onClose={() => { setShowArchiveConfirm(false); setArchivingProgram(null); }}
-          title="Archive Training Program"
-          subtitle="Program can be restored later"
-          colorVariant="orange"
-          icon={Archive}
-          size="md"
-        >
-          {archivingProgram && (
+        {archivingProgram && (
+          <ModernModal
+            isOpen={showArchiveConfirm}
+            onClose={() => { setShowArchiveConfirm(false); setArchivingProgram(null); }}
+            title="Archive Training Program"
+            subtitle="Program can be restored later"
+            colorVariant="orange"
+            icon={Archive}
+            size="md"
+          >
             <div className="space-y-4">
               <p className="text-gray-600 text-center">
                 Are you sure you want to hide and mark it as completed "<strong>{archivingProgram.title}</strong>"? You can restore it later from the Completed tab.
@@ -848,20 +834,20 @@ export default function PESOProgramsPage() {
                   </Button>
                 </div>
             </div>
-          )}
-        </ModernModal>
+          </ModernModal>
+        )}
 
         {/* Restore Confirmation Modal */}
-        <ModernModal
-          isOpen={showRestoreConfirm && restoringProgram !== null}
-          onClose={() => { setShowRestoreConfirm(false); setRestoringProgram(null); }}
-          title="Restore Training Program"
-          subtitle="Reactivate hidden program"
-          colorVariant="green"
-          icon={Undo2}
-          size="md"
-        >
-          {restoringProgram && (
+        {restoringProgram && (
+          <ModernModal
+            isOpen={showRestoreConfirm}
+            onClose={() => { setShowRestoreConfirm(false); setRestoringProgram(null); }}
+            title="Restore Training Program"
+            subtitle="Reactivate hidden program"
+            colorVariant="green"
+            icon={Undo2}
+            size="md"
+          >
             <div className="space-y-4">
               <p className="text-gray-600 text-center">
                 Are you sure you want to restore "<strong>{restoringProgram.title}</strong>"? It will be marked as active again.
@@ -886,20 +872,20 @@ export default function PESOProgramsPage() {
                   </Button>
                 </div>
             </div>
-          )}
-        </ModernModal>
+          </ModernModal>
+        )}
 
         {/* Delete Confirmation Modal */}
-        <ModernModal
-          isOpen={showDeleteConfirm && deletingProgram !== null}
-          onClose={() => { setShowDeleteConfirm(false); setDeletingProgram(null); }}
-          title="Delete Training Program"
-          subtitle="This action cannot be undone"
-          colorVariant="red"
-          icon={Trash2}
-          size="md"
-        >
-          {deletingProgram && (
+        {deletingProgram && (
+          <ModernModal
+            isOpen={showDeleteConfirm}
+            onClose={() => { setShowDeleteConfirm(false); setDeletingProgram(null); }}
+            title="Delete Training Program"
+            subtitle="This action cannot be undone"
+            colorVariant="red"
+            icon={Trash2}
+            size="md"
+          >
             <div className="space-y-4">
               <p className="text-gray-600 text-center">
                 Are you sure you want to permanently delete "<strong>{deletingProgram.title}</strong>"? This action cannot be undone.
@@ -924,8 +910,18 @@ export default function PESOProgramsPage() {
                   </Button>
                 </div>
             </div>
-          )}
-        </ModernModal>
+          </ModernModal>
+        )}
+
+        {/* Program Details Preview Modal */}
+        {previewProgram && (
+          <ProgramDetailsModal
+            program={previewProgram}
+            isOpen={showPreviewModal}
+            onClose={() => { setShowPreviewModal(false); setPreviewProgram(null); }}
+            onEdit={handleEdit}
+          />
+        )}
       </Container>
     </AdminLayout>
   );

@@ -132,7 +132,7 @@ export async function PUT(
     }
 
     // 6. Validate required fields
-    const { title, description, duration, capacity, start_date, status, schedule, location, skills_covered, icon, end_date } = body;
+    const { title, description, duration, capacity, start_date, status, schedule, location, speaker_name, skills_covered, icon, end_date } = body;
 
     if (!title || !description || !duration || !capacity || !start_date) {
       return NextResponse.json(
@@ -167,6 +167,7 @@ export async function PUT(
       schedule: schedule || null,
       capacity: capacityNum,
       location: location || null,
+      speaker_name: speaker_name || null,
       start_date,
       end_date: end_date || null,
       skills_covered: skills_covered || [],
