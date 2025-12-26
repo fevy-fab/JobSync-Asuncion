@@ -110,6 +110,19 @@ export function translateError(error: any): UserFriendlyError {
     };
   }
 
+  // Rate limit errors
+  if (
+    lowerMessage.includes('rate limit') ||
+    lowerMessage.includes('too many requests') ||
+    lowerMessage.includes('over_email_send_rate_limit') ||
+    error.status === 429 ||
+    error.code === 'over_email_send_rate_limit'
+  ) {
+    return {
+      message: 'You have made too many requests. Please wait a few minutes and try again.'
+    };
+  }
+
   // ==================== VALIDATION ERRORS ====================
 
   // Required field missing

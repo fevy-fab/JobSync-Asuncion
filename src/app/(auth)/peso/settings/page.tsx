@@ -3,11 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Card, Container, Input, Button, ImagePreviewModal } from '@/components/ui';
 import { ProfilePictureUpload } from '@/components/applicant/ProfilePictureUpload';
+import { EmailVerificationStatus } from '@/components/account/EmailVerificationStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { Save, Lock, Loader2, User, Mail, Phone, CheckCircle, AlertCircle, Edit as EditIcon, X } from 'lucide-react';
 import { updateProfileSchema, changePasswordSchema } from '@/lib/validation/profileSchema';
 import { formatPhilippinePhone } from '@/lib/utils/phoneFormatter';
+import { createClient } from '@/lib/supabase/client';
 
 interface ProfileData {
   id: string;
@@ -34,6 +36,9 @@ export default function PESOSettingsPage() {
   const [profileSaving, setSaving] = useState(false);
   const [profileDirty, setProfileDirty] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [lastSaveAttempt, setLastSaveAttempt] = useState<number>(0);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   // Password form state
   const [passwordForm, setPasswordForm] = useState({
@@ -70,6 +75,14 @@ export default function PESOSettingsPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isEditingProfile, profileDirty, profileSaving]);
 
+  // Cooldown timer for resend button
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
   const fetchProfile = async () => {
     setProfileLoading(true);
     try {
@@ -86,6 +99,11 @@ export default function PESOSettingsPage() {
         email: data.profile.email || '',
         phone: data.profile.phone || '',
       });
+
+      // Check for pending email change
+      const supabase = createClient();
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      setPendingEmail(authUser?.user_metadata?.email_change || null);
     } catch (error) {
       console.error('Error fetching profile:', error);
       showToast(
@@ -104,6 +122,16 @@ export default function PESOSettingsPage() {
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Check cooldown (5 seconds between saves)
+    const SAVE_COOLDOWN_MS = 5000;
+    const now = Date.now();
+    if (now - lastSaveAttempt < SAVE_COOLDOWN_MS) {
+      const waitSeconds = Math.ceil((SAVE_COOLDOWN_MS - (now - lastSaveAttempt)) / 1000);
+      showToast(`Please wait ${waitSeconds} seconds before saving again`, 'warning');
+      return;
+    }
+    setLastSaveAttempt(now);
 
     // Validate form data
     const validation = updateProfileSchema.safeParse(profileForm);
@@ -128,6 +156,16 @@ export default function PESOSettingsPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle rate limit errors specifically
+        if (response.status === 429) {
+          const waitTime = data.retryAfter ? Math.ceil(data.retryAfter / 60) : 5;
+          showToast(
+            `${data.error || 'Too many requests'}. Please wait ${waitTime} minutes before trying again.`,
+            'warning'
+          );
+          return;
+        }
+
         throw new Error(data.error || 'Failed to update profile');
       }
 
@@ -323,6 +361,38 @@ export default function PESOSettingsPage() {
               variant="elevated"
               className="lg:col-span-2 transition-all duration-200 hover:shadow-2xl hover:-translate-y-0.5"
             >
+              {/* Email Verification Status - Show if pending email change */}
+              {pendingEmail && (
+                <div className="mb-4">
+                  <EmailVerificationStatus
+                    currentEmail={profile?.email || ''}
+                    pendingEmail={pendingEmail}
+                    onResend={async () => {
+                      // Check cooldown
+                      if (resendCooldown > 0) {
+                        showToast(`Please wait ${resendCooldown} seconds before resending`, 'warning');
+                        return;
+                      }
+
+                      try {
+                        const supabase = createClient();
+                        await supabase.auth.updateUser({ email: pendingEmail });
+                        setResendCooldown(60); // 60 second cooldown on success
+                        showToast('Verification emails resent successfully', 'success');
+                      } catch (error: any) {
+                        // Handle rate limit errors
+                        if (error?.status === 429 || error?.code === 'over_email_send_rate_limit') {
+                          setResendCooldown(300); // 5 minute cooldown on rate limit
+                          showToast('Too many requests. Please wait 5 minutes before trying again.', 'error');
+                        } else {
+                          showToast('Failed to resend verification emails', 'error');
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
               <form
                 onSubmit={handleProfileSubmit}
                 className="space-y-4"

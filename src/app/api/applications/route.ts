@@ -208,6 +208,7 @@ export async function GET(request: NextRequest) {
         reviewed_by,
         reviewed_at,
         notification_sent,
+        hr_notes,
         created_at,
         updated_at,
         matched_skills_count,

@@ -156,6 +156,7 @@ interface RankingDetailsModalProps {
     };
     topPerformers?: TopPerformer[];
     totalApplicants?: number;
+    hr_notes?: string | null;
   } | null;
   jobRequirements?: {
     degreeRequirement: string;
@@ -1612,6 +1613,24 @@ export function RankingDetailsModal({
             </div>
           </div>
         </div>
+
+        {/* HR Internal Notes (HR Only) */}
+        {applicant.hr_notes && (
+          <div className="mt-6 p-5 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl border-2 border-amber-200">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-600" />
+              Internal Notes (HR Only)
+            </h3>
+            <div className="bg-white rounded-lg p-4 border border-amber-200">
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {applicant.hr_notes}
+              </p>
+            </div>
+            <p className="text-xs text-amber-700 mt-2 italic">
+              These notes are for HR reference only and are not visible to the applicant.
+            </p>
+          </div>
+        )}
 
         {/* Algorithm analysis */}
         {applicant.algorithmDetails && (

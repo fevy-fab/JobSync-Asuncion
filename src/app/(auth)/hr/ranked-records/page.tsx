@@ -817,6 +817,7 @@ export default function RankedRecordsPage() {
       percentiles,
       topPerformers,
       totalApplicants: jobApplicants.length,
+      hr_notes: raw?.hr_notes || null,
     };
 
     // Extract job requirements from the raw data (using freshest job fields)

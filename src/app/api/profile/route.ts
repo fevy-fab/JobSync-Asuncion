@@ -85,6 +85,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const updates = validation.data;
+    let emailChangeInitiated = false;
 
     // Check if email is being changed and if it conflicts with existing users
     if (updates.email && updates.email !== user.email) {
@@ -102,18 +103,38 @@ export async function PATCH(request: NextRequest) {
         );
       }
 
-      // Update email in auth.users as well
+      // Trigger email change verification in auth.users
+      // Supabase will send verification emails to BOTH current and new email addresses
       const { error: authUpdateError } = await supabase.auth.updateUser({
         email: updates.email,
       });
 
       if (authUpdateError) {
         console.error('Error updating auth email:', authUpdateError);
+
+        // Handle rate limit errors specifically
+        if (authUpdateError.code === 'over_email_send_rate_limit' || authUpdateError.status === 429) {
+          return NextResponse.json(
+            {
+              error: 'Too many email change requests. Please wait a few minutes before trying again.',
+              code: 'RATE_LIMIT_EXCEEDED',
+              retryAfter: 300 // 5 minutes in seconds
+            },
+            { status: 429 }
+          );
+        }
+
         return NextResponse.json(
-          { error: 'Failed to update email in authentication system' },
+          { error: 'Failed to initiate email change. Please try again.' },
           { status: 500 }
         );
       }
+
+      // DO NOT update profiles.email immediately
+      // It will be synced automatically when email verification is completed
+      // Remove email from updates to prevent immediate update
+      delete updates.email;
+      emailChangeInitiated = true;
     }
 
     // Update profile in database (RLS enforces user can only update own profile)
@@ -153,8 +174,11 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json(
       {
-        message: 'Profile updated successfully',
+        message: emailChangeInitiated
+          ? 'Profile updated. Email verification required: Check both your current and new email addresses for confirmation links.'
+          : 'Profile updated successfully',
         profile: updatedProfile,
+        emailChangeInitiated,
       },
       { status: 200 }
     );
