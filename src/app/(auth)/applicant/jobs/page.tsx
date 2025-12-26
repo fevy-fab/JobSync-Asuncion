@@ -1,7 +1,9 @@
 'use client';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Button, Card, ApplicationModal, Container, Badge, RefreshButton, ModernModal } from '@/components/ui';
+import { SortDropdown, DEFAULT_SORT_OPTIONS } from '@/components/ui/SortDropdown';
+import { DateRangeFilter, DEFAULT_DATE_RANGE_OPTIONS, isDateInRange } from '@/components/ui/DateRangeFilter';
 import { AdminLayout } from '@/components/layout';
 import { ApplicationStatusBadge, AppliedBadge } from '@/components/ApplicationStatusBadge';
 import { StatusTimeline } from '@/components/hr/StatusTimeline';
@@ -105,6 +107,71 @@ export default function AuthenticatedJobsPage() {
 
   // Description expansion state
   const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
+
+  // Filter and Sort state for My Applications tab
+  const [applicationsSort, setApplicationsSort] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-jobs-applications-sort') || 'newest';
+    }
+    return 'newest';
+  });
+  const [applicationsStatusFilter, setApplicationsStatusFilter] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-jobs-applications-status') || 'all';
+    }
+    return 'all';
+  });
+  const [applicationsDateRange, setApplicationsDateRange] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-jobs-applications-date') || 'all';
+    }
+    return 'all';
+  });
+
+  // Filter and Sort state for Application History tab
+  const [historySort, setHistorySort] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-jobs-history-sort') || 'newest';
+    }
+    return 'newest';
+  });
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-jobs-history-status') || 'all';
+    }
+    return 'all';
+  });
+  const [historyDateRange, setHistoryDateRange] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-jobs-history-date') || 'all';
+    }
+    return 'all';
+  });
+
+  // Save filters to localStorage
+  useEffect(() => {
+    localStorage.setItem('applicant-jobs-applications-sort', applicationsSort);
+  }, [applicationsSort]);
+
+  useEffect(() => {
+    localStorage.setItem('applicant-jobs-applications-status', applicationsStatusFilter);
+  }, [applicationsStatusFilter]);
+
+  useEffect(() => {
+    localStorage.setItem('applicant-jobs-applications-date', applicationsDateRange);
+  }, [applicationsDateRange]);
+
+  useEffect(() => {
+    localStorage.setItem('applicant-jobs-history-sort', historySort);
+  }, [historySort]);
+
+  useEffect(() => {
+    localStorage.setItem('applicant-jobs-history-status', historyStatusFilter);
+  }, [historyStatusFilter]);
+
+  useEffect(() => {
+    localStorage.setItem('applicant-jobs-history-date', historyDateRange);
+  }, [historyDateRange]);
 
   // Fetch jobs function
   const fetchJobs = useCallback(async () => {
@@ -281,6 +348,64 @@ export default function AuthenticatedJobsPage() {
   const historyApplications = userApplications.filter(app =>
     ['hired', 'denied', 'withdrawn', 'archived'].includes(app.status)
   );
+
+  // Filtered and sorted My Applications
+  const filteredAndSortedActiveApplications = useMemo(() => {
+    let filtered = [...activeApplications];
+
+    // Apply status filter
+    if (applicationsStatusFilter !== 'all') {
+      filtered = filtered.filter(app => app.status === applicationsStatusFilter);
+    }
+
+    // Apply date range filter
+    filtered = filtered.filter(app => isDateInRange(app.created_at, applicationsDateRange, DEFAULT_DATE_RANGE_OPTIONS));
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (applicationsSort) {
+        case 'newest':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'updated':
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [activeApplications, applicationsStatusFilter, applicationsDateRange, applicationsSort]);
+
+  // Filtered and sorted Application History
+  const filteredAndSortedHistoryApplications = useMemo(() => {
+    let filtered = [...historyApplications];
+
+    // Apply status filter
+    if (historyStatusFilter !== 'all') {
+      filtered = filtered.filter(app => app.status === historyStatusFilter);
+    }
+
+    // Apply date range filter
+    filtered = filtered.filter(app => isDateInRange(app.created_at, historyDateRange, DEFAULT_DATE_RANGE_OPTIONS));
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (historySort) {
+        case 'newest':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'updated':
+          return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [historyApplications, historyStatusFilter, historyDateRange, historySort]);
 
   // Filter jobs for Available Jobs tab
   const filteredJobs = jobsWithApplicationStatus.filter(job => {
@@ -782,8 +907,75 @@ export default function AuthenticatedJobsPage() {
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">
-                  My Applications ({activeApplications.length})
+                  My Applications ({filteredAndSortedActiveApplications.length} of {activeApplications.length})
                 </h2>
+              </div>
+
+              {/* Filters and Sorting */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Sort Dropdown */}
+                  <SortDropdown
+                    value={applicationsSort}
+                    onChange={setApplicationsSort}
+                    options={DEFAULT_SORT_OPTIONS}
+                  />
+
+                  {/* Status Filter (Quick Pills) */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Status:</span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setApplicationsStatusFilter('all')}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          applicationsStatusFilter === 'all'
+                            ? 'bg-[#22A555] text-white shadow-md'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        All ({activeApplications.length})
+                      </button>
+                      {['pending', 'under_review', 'shortlisted', 'interviewed', 'approved'].map(status => {
+                        const count = activeApplications.filter(app => app.status === status).length;
+                        if (count === 0) return null;
+                        return (
+                          <button
+                            key={status}
+                            onClick={() => setApplicationsStatusFilter(status)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                              applicationsStatusFilter === status
+                                ? 'bg-[#22A555] text-white shadow-md'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Date Range Filter */}
+                  <DateRangeFilter
+                    value={applicationsDateRange}
+                    onChange={setApplicationsDateRange}
+                    options={DEFAULT_DATE_RANGE_OPTIONS}
+                  />
+
+                  {/* Clear Filters */}
+                  {(applicationsStatusFilter !== 'all' || applicationsDateRange !== 'all' || applicationsSort !== 'newest') && (
+                    <button
+                      onClick={() => {
+                        setApplicationsStatusFilter('all');
+                        setApplicationsDateRange('all');
+                        setApplicationsSort('newest');
+                      }}
+                      className="ml-auto px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
               </div>
 
               {loadingApplications ? (
@@ -802,9 +994,27 @@ export default function AuthenticatedJobsPage() {
                     Browse Jobs
                   </Button>
                 </Card>
+              ) : filteredAndSortedActiveApplications.length === 0 ? (
+                <Card className="text-center py-16">
+                  <Filter className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No applications match your filters</h3>
+                  <p className="text-gray-600 mb-4">
+                    Try adjusting your filters or date range
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setApplicationsStatusFilter('all');
+                      setApplicationsDateRange('all');
+                      setApplicationsSort('newest');
+                    }}
+                  >
+                    Clear All Filters
+                  </Button>
+                </Card>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
-                  {activeApplications.map((app, index) => {
+                  {filteredAndSortedActiveApplications.map((app, index) => {
                     const statusConfig = getStatusConfig(app.status);
                     const canWithdraw = app.status === 'pending' || app.status === 'under_review';
 
@@ -934,8 +1144,75 @@ export default function AuthenticatedJobsPage() {
             <div className="space-y-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-bold text-gray-900">
-                  Application History ({historyApplications.length})
+                  Application History ({filteredAndSortedHistoryApplications.length} of {historyApplications.length})
                 </h2>
+              </div>
+
+              {/* Filters and Sorting */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Sort Dropdown */}
+                  <SortDropdown
+                    value={historySort}
+                    onChange={setHistorySort}
+                    options={DEFAULT_SORT_OPTIONS}
+                  />
+
+                  {/* Status Filter (Quick Pills) */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-700">Status:</span>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setHistoryStatusFilter('all')}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          historyStatusFilter === 'all'
+                            ? 'bg-[#22A555] text-white shadow-md'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        All ({historyApplications.length})
+                      </button>
+                      {['hired', 'denied', 'withdrawn', 'archived'].map(status => {
+                        const count = historyApplications.filter(app => app.status === status).length;
+                        if (count === 0) return null;
+                        return (
+                          <button
+                            key={status}
+                            onClick={() => setHistoryStatusFilter(status)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                              historyStatusFilter === status
+                                ? 'bg-[#22A555] text-white shadow-md'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {status.charAt(0).toUpperCase() + status.slice(1)} ({count})
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Date Range Filter */}
+                  <DateRangeFilter
+                    value={historyDateRange}
+                    onChange={setHistoryDateRange}
+                    options={DEFAULT_DATE_RANGE_OPTIONS}
+                  />
+
+                  {/* Clear Filters */}
+                  {(historyStatusFilter !== 'all' || historyDateRange !== 'all' || historySort !== 'newest') && (
+                    <button
+                      onClick={() => {
+                        setHistoryStatusFilter('all');
+                        setHistoryDateRange('all');
+                        setHistorySort('newest');
+                      }}
+                      className="ml-auto px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
               </div>
 
               {loadingApplications ? (
@@ -954,9 +1231,27 @@ export default function AuthenticatedJobsPage() {
                     Browse Jobs
                   </Button>
                 </Card>
+              ) : filteredAndSortedHistoryApplications.length === 0 ? (
+                <Card className="text-center py-16">
+                  <Filter className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No applications match your filters</h3>
+                  <p className="text-gray-600 mb-4">
+                    Try adjusting your filters or date range
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setHistoryStatusFilter('all');
+                      setHistoryDateRange('all');
+                      setHistorySort('newest');
+                    }}
+                  >
+                    Clear All Filters
+                  </Button>
+                </Card>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {historyApplications.map((app, index) => {
+                  {filteredAndSortedHistoryApplications.map((app, index) => {
                     const statusConfig = getStatusConfig(app.status);
                     const isHired = app.status === 'hired';
                     const isDenied = app.status === 'denied';

@@ -1,7 +1,9 @@
 'use client';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Button, Card, Container, Badge, RefreshButton, Modal, ModernModal, Input, Textarea } from '@/components/ui';
+import { SortDropdown, DEFAULT_SORT_OPTIONS } from '@/components/ui/SortDropdown';
+import { DateRangeFilter, DEFAULT_DATE_RANGE_OPTIONS, isDateInRange } from '@/components/ui/DateRangeFilter';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -98,6 +100,71 @@ export default function TrainingsPage() {
 
   // Tab state for organizing view
   const [activeTab, setActiveTab] = useState<'available' | 'enrolled' | 'completed'>('available');
+
+  // Filter and Sort state for My Enrollments tab
+  const [enrolledSort, setEnrolledSort] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-trainings-enrolled-sort') || 'newest';
+    }
+    return 'newest';
+  });
+  const [enrolledStatusFilter, setEnrolledStatusFilter] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-trainings-enrolled-status') || 'all';
+    }
+    return 'all';
+  });
+  const [enrolledDateRange, setEnrolledDateRange] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-trainings-enrolled-date') || 'all';
+    }
+    return 'all';
+  });
+
+  // Filter and Sort state for Training History tab
+  const [historySort, setHistorySort] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-trainings-history-sort') || 'newest';
+    }
+    return 'newest';
+  });
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-trainings-history-status') || 'all';
+    }
+    return 'all';
+  });
+  const [historyDateRange, setHistoryDateRange] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('applicant-trainings-history-date') || 'all';
+    }
+    return 'all';
+  });
+
+  // Save filters to localStorage
+  useEffect(() => {
+    localStorage.setItem('applicant-trainings-enrolled-sort', enrolledSort);
+  }, [enrolledSort]);
+
+  useEffect(() => {
+    localStorage.setItem('applicant-trainings-enrolled-status', enrolledStatusFilter);
+  }, [enrolledStatusFilter]);
+
+  useEffect(() => {
+    localStorage.setItem('applicant-trainings-enrolled-date', enrolledDateRange);
+  }, [enrolledDateRange]);
+
+  useEffect(() => {
+    localStorage.setItem('applicant-trainings-history-sort', historySort);
+  }, [historySort]);
+
+  useEffect(() => {
+    localStorage.setItem('applicant-trainings-history-status', historyStatusFilter);
+  }, [historyStatusFilter]);
+
+  useEffect(() => {
+    localStorage.setItem('applicant-trainings-history-date', historyDateRange);
+  }, [historyDateRange]);
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -514,6 +581,65 @@ export default function TrainingsPage() {
   const completedApplications = userApplications.filter(app =>
     ['completed', 'certified', 'failed', 'withdrawn', 'denied', 'archived'].includes(app.status)
   );
+
+  // Filtered and sorted My Enrollments
+  const filteredAndSortedEnrolledApplications = useMemo(() => {
+    let filtered = [...enrolledApplications];
+
+    // Apply status filter
+    if (enrolledStatusFilter !== 'all') {
+      filtered = filtered.filter(app => app.status === enrolledStatusFilter);
+    }
+
+    // Apply date range filter
+    filtered = filtered.filter(app => isDateInRange(app.submitted_at, enrolledDateRange, DEFAULT_DATE_RANGE_OPTIONS));
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (enrolledSort) {
+        case 'newest':
+          return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
+        case 'oldest':
+          return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime();
+        case 'updated':
+          // Note: training applications don't have updated_at, use submitted_at
+          return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [enrolledApplications, enrolledStatusFilter, enrolledDateRange, enrolledSort]);
+
+  // Filtered and sorted Training History
+  const filteredAndSortedHistoryApplications = useMemo(() => {
+    let filtered = [...completedApplications];
+
+    // Apply status filter
+    if (historyStatusFilter !== 'all') {
+      filtered = filtered.filter(app => app.status === historyStatusFilter);
+    }
+
+    // Apply date range filter
+    filtered = filtered.filter(app => isDateInRange(app.submitted_at, historyDateRange, DEFAULT_DATE_RANGE_OPTIONS));
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (historySort) {
+        case 'newest':
+          return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
+        case 'oldest':
+          return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime();
+        case 'updated':
+          return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [completedApplications, historyStatusFilter, historyDateRange, historySort]);
 
   // Calculate stats
   const stats = {
@@ -989,8 +1115,75 @@ export default function TrainingsPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900">
-              My Enrollments ({enrolledApplications.length})
+              My Enrollments ({filteredAndSortedEnrolledApplications.length} of {enrolledApplications.length})
             </h2>
+          </div>
+
+          {/* Filters and Sorting */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Sort Dropdown */}
+              <SortDropdown
+                value={enrolledSort}
+                onChange={setEnrolledSort}
+                options={DEFAULT_SORT_OPTIONS}
+              />
+
+              {/* Status Filter (Quick Pills) */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700">Status:</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setEnrolledStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      enrolledStatusFilter === 'all'
+                        ? 'bg-[#22A555] text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All ({enrolledApplications.length})
+                  </button>
+                  {['pending', 'under_review', 'approved', 'enrolled', 'in_progress'].map(status => {
+                    const count = enrolledApplications.filter(app => app.status === status).length;
+                    if (count === 0) return null;
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => setEnrolledStatusFilter(status)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          enrolledStatusFilter === status
+                            ? 'bg-[#22A555] text-white shadow-md'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Date Range Filter */}
+              <DateRangeFilter
+                value={enrolledDateRange}
+                onChange={setEnrolledDateRange}
+                options={DEFAULT_DATE_RANGE_OPTIONS}
+              />
+
+              {/* Clear Filters */}
+              {(enrolledStatusFilter !== 'all' || enrolledDateRange !== 'all' || enrolledSort !== 'newest') && (
+                <button
+                  onClick={() => {
+                    setEnrolledStatusFilter('all');
+                    setEnrolledDateRange('all');
+                    setEnrolledSort('newest');
+                  }}
+                  className="ml-auto px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
           </div>
 
           {loading ? (
@@ -1009,9 +1202,27 @@ export default function TrainingsPage() {
                 Browse Programs
               </Button>
             </Card>
+          ) : filteredAndSortedEnrolledApplications.length === 0 ? (
+            <Card className="text-center py-16">
+              <Filter className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No enrollments match your filters</h3>
+              <p className="text-gray-600 mb-4">
+                Try adjusting your filters or date range
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEnrolledStatusFilter('all');
+                  setEnrolledDateRange('all');
+                  setEnrolledSort('newest');
+                }}
+              >
+                Clear All Filters
+              </Button>
+            </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
-              {enrolledApplications.map((app, index) => {
+              {filteredAndSortedEnrolledApplications.map((app, index) => {
                 const statusConfig = getStatusConfig(app.status);
                 // Allow withdrawal for applications that haven't started training yet
                 const canWithdraw = ['pending', 'under_review', 'approved', 'enrolled'].includes(app.status);
@@ -1136,8 +1347,75 @@ export default function TrainingsPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-gray-900">
-              Training History ({completedApplications.length})
+              Training History ({filteredAndSortedHistoryApplications.length} of {completedApplications.length})
             </h2>
+          </div>
+
+          {/* Filters and Sorting */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Sort Dropdown */}
+              <SortDropdown
+                value={historySort}
+                onChange={setHistorySort}
+                options={DEFAULT_SORT_OPTIONS}
+              />
+
+              {/* Status Filter (Quick Pills) */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700">Status:</span>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setHistoryStatusFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                      historyStatusFilter === 'all'
+                        ? 'bg-[#22A555] text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    All ({completedApplications.length})
+                  </button>
+                  {['completed', 'certified', 'failed', 'withdrawn', 'denied', 'archived'].map(status => {
+                    const count = completedApplications.filter(app => app.status === status).length;
+                    if (count === 0) return null;
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => setHistoryStatusFilter(status)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                          historyStatusFilter === status
+                            ? 'bg-[#22A555] text-white shadow-md'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {status.charAt(0).toUpperCase() + status.slice(1)} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Date Range Filter */}
+              <DateRangeFilter
+                value={historyDateRange}
+                onChange={setHistoryDateRange}
+                options={DEFAULT_DATE_RANGE_OPTIONS}
+              />
+
+              {/* Clear Filters */}
+              {(historyStatusFilter !== 'all' || historyDateRange !== 'all' || historySort !== 'newest') && (
+                <button
+                  onClick={() => {
+                    setHistoryStatusFilter('all');
+                    setHistoryDateRange('all');
+                    setHistorySort('newest');
+                  }}
+                  className="ml-auto px-4 py-2 text-sm text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
           </div>
 
           {loading ? (
@@ -1156,9 +1434,27 @@ export default function TrainingsPage() {
                 View My Enrollments
               </Button>
             </Card>
+          ) : filteredAndSortedHistoryApplications.length === 0 ? (
+            <Card className="text-center py-16">
+              <Filter className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No applications match your filters</h3>
+              <p className="text-gray-600 mb-4">
+                Try adjusting your filters or date range
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setHistoryStatusFilter('all');
+                  setHistoryDateRange('all');
+                  setHistorySort('newest');
+                }}
+              >
+                Clear All Filters
+              </Button>
+            </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {completedApplications.map((app, index) => {
+              {filteredAndSortedHistoryApplications.map((app, index) => {
                 const statusConfig = getStatusConfig(app.status);
                 const isCertified = app.status === 'certified';
                 const isCompleted = app.status === 'completed';

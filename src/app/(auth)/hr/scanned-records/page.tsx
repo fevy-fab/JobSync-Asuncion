@@ -2,6 +2,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { AdminLayout } from '@/components/layout';
 import { Avatar, Card, EnhancedTable, Button, Container, Badge, RefreshButton, StatusFilter, QuickFilters, ImagePreviewModal } from '@/components/ui';
+import { DateRangeFilter, DEFAULT_DATE_RANGE_OPTIONS, isDateInRange } from '@/components/ui/DateRangeFilter';
+import { SortDropdown } from '@/components/ui/SortDropdown';
 import { ApplicationStatusBadge } from '@/components/ApplicationStatusBadge';
 import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { ApplicationDrawer } from '@/components/hr/ApplicationDrawer';
@@ -45,9 +47,29 @@ export default function ScannedRecordsPage() {
   const [selectedJob, setSelectedJob] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [quickFilter, setQuickFilter] = useState<string>('all');
-  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('hr-scanned-records-date') || 'all';
+    }
+    return 'all';
+  });
+  const [sortOrder, setSortOrder] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('hr-scanned-records-sort') || 'newest';
+    }
+    return 'newest';
+  });
   const [showApplicationDrawer, setShowApplicationDrawer] = useState(false);
   const [selectedApplicationForDrawer, setSelectedApplicationForDrawer] = useState<Application | null>(null);
+
+  // Save filters to localStorage
+  useEffect(() => {
+    localStorage.setItem('hr-scanned-records-date', dateRangeFilter);
+  }, [dateRangeFilter]);
+
+  useEffect(() => {
+    localStorage.setItem('hr-scanned-records-sort', sortOrder);
+  }, [sortOrder]);
   const [pdsDataModal, setPdsDataModal] = useState<{
     isOpen: boolean;
     data: any;
@@ -307,29 +329,35 @@ export default function ScannedRecordsPage() {
       matchesQuickFilter = quickFilterMap[quickFilter]?.includes(app.status) || false;
     }
 
-    // Date filter
-    let matchesDate = true;
-    if (dateFilter !== 'all') {
-      const uploadDate = new Date(app._raw.created_at);
-      const today = new Date();
-      const diffDays = Math.floor((today.getTime() - uploadDate.getTime()) / (1000 * 60 * 60 * 24));
+    // Date range filter
+    const matchesDateRange = isDateInRange(
+      app._raw.created_at,
+      dateRangeFilter,
+      DEFAULT_DATE_RANGE_OPTIONS
+    );
 
-      switch (dateFilter) {
-        case 'today':
-          matchesDate = diffDays === 0;
-          break;
-        case 'week':
-          matchesDate = diffDays <= 7;
-          break;
-        case 'month':
-          matchesDate = diffDays <= 30;
-          break;
-        default:
-          matchesDate = true;
-      }
+    return matchesJob && matchesStatus && matchesQuickFilter && matchesDateRange;
+  });
+
+  // Sort applications based on selected sort order
+  const sortedApplications = [...filteredApplications].sort((a, b) => {
+    switch (sortOrder) {
+      case 'newest':
+        // Most recent applications first
+        return new Date(b._raw.created_at).getTime() - new Date(a._raw.created_at).getTime();
+
+      case 'oldest':
+        // Oldest applications first
+        return new Date(a._raw.created_at).getTime() - new Date(b._raw.created_at).getTime();
+
+      case 'updated':
+        // Recently updated first
+        return new Date(b._raw.updated_at).getTime() - new Date(a._raw.updated_at).getTime();
+
+      default:
+        // Default to newest
+        return new Date(b._raw.created_at).getTime() - new Date(a._raw.created_at).getTime();
     }
-
-    return matchesJob && matchesStatus && matchesQuickFilter && matchesDate;
   });
 
   // Quick filter counts
@@ -383,16 +411,22 @@ export default function ScannedRecordsPage() {
                 onChange={setStatusFilter}
               />
 
-              <select
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#22A555]"
-              >
-                <option value="all">All Dates</option>
-                <option value="today">Today</option>
-                <option value="week">Last 7 Days</option>
-                <option value="month">Last 30 Days</option>
-              </select>
+              <SortDropdown
+                value={sortOrder}
+                onChange={setSortOrder}
+                options={[
+                  { value: 'newest', label: 'Newest First' },
+                  { value: 'oldest', label: 'Oldest First' },
+                  { value: 'updated', label: 'Recently Updated' },
+                ]}
+              />
+
+              <DateRangeFilter
+                value={dateRangeFilter}
+                onChange={setDateRangeFilter}
+                options={DEFAULT_DATE_RANGE_OPTIONS}
+                label="Date applied"
+              />
             </div>
 
             <RefreshButton
@@ -482,7 +516,7 @@ export default function ScannedRecordsPage() {
             ) : (
               <EnhancedTable
                 columns={columns}
-                data={filteredApplications}
+                data={sortedApplications}
                 searchable
                 paginated
                 pageSize={10}

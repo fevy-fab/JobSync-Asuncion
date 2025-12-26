@@ -1,8 +1,10 @@
 'use client';
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout';
 import Image from 'next/image';
 import { Avatar, Card, EnhancedTable, Button, Container, Badge, RefreshButton, DropdownMenu, type DropdownMenuItem, StatusFilter, QuickFilters, ImagePreviewModal } from '@/components/ui';
+import { DateRangeFilter, DEFAULT_DATE_RANGE_OPTIONS, isDateInRange } from '@/components/ui/DateRangeFilter';
+import { SortDropdown } from '@/components/ui/SortDropdown';
 import { ApplicationStatusBadge } from '@/components/ApplicationStatusBadge';
 import { PDSViewModal } from '@/components/ui/PDSViewModal';
 import { RankingDetailsModal } from '@/components/hr/RankingDetailsModal';
@@ -86,6 +88,28 @@ export default function RankedRecordsPage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [quickFilter, setQuickFilter] = useState<string>('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('hr-ranked-records-date') || 'all';
+    }
+    return 'all';
+  });
+  const [sortOrder, setSortOrder] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('hr-ranked-records-sort') || 'highest_rank';
+    }
+    return 'highest_rank';
+  });
+
+  // Save date range filter to localStorage
+  useEffect(() => {
+    localStorage.setItem('hr-ranked-records-date', dateRangeFilter);
+  }, [dateRangeFilter]);
+
+  // Save sort order to localStorage
+  useEffect(() => {
+    localStorage.setItem('hr-ranked-records-sort', sortOrder);
+  }, [sortOrder]);
   const [selectedApplicationForDrawer, setSelectedApplicationForDrawer] = useState<Application | null>(null);
   const [showApplicationDrawer, setShowApplicationDrawer] = useState(false);
   const [isRanking, setIsRanking] = useState(false);
@@ -1251,7 +1275,7 @@ export default function RankedRecordsPage() {
     },
   ];
 
-  // Filter applications by selected job and status
+  // Filter applications by selected job, status, and date range
   const filteredApplications = applications.filter((app) => {
     // Job filter
     const matchesJob = selectedJob === 'all' || app._raw.job_id === selectedJob;
@@ -1271,15 +1295,48 @@ export default function RankedRecordsPage() {
       matchesQuickFilter = quickFilterMap[quickFilter]?.includes(app.status) || false;
     }
 
-    return matchesJob && matchesStatus && matchesQuickFilter;
+    // Date range filter
+    const matchesDateRange = isDateInRange(
+      app._raw.created_at,
+      dateRangeFilter,
+      DEFAULT_DATE_RANGE_OPTIONS
+    );
+
+    return matchesJob && matchesStatus && matchesQuickFilter && matchesDateRange;
   });
 
-  // Sort by rank (nulls last), then by match score
+  // Sort applications based on selected sort order
   const sortedApplications = [...filteredApplications].sort((a, b) => {
-    if (a.rank === null && b.rank === null) return 0;
-    if (a.rank === null) return 1;
-    if (b.rank === null) return -1;
-    return a.rank - b.rank;
+    switch (sortOrder) {
+      case 'highest_rank':
+        // Rank 1 is highest (best), nulls last
+        if (a.rank === null && b.rank === null) return 0;
+        if (a.rank === null) return 1;
+        if (b.rank === null) return -1;
+        return a.rank - b.rank;
+
+      case 'lowest_rank':
+        // Reverse order - higher rank numbers first, nulls last
+        if (a.rank === null && b.rank === null) return 0;
+        if (a.rank === null) return 1;
+        if (b.rank === null) return -1;
+        return b.rank - a.rank;
+
+      case 'newest':
+        // Most recent applications first
+        return new Date(b._raw.created_at).getTime() - new Date(a._raw.created_at).getTime();
+
+      case 'oldest':
+        // Oldest applications first
+        return new Date(a._raw.created_at).getTime() - new Date(b._raw.created_at).getTime();
+
+      default:
+        // Default to highest rank
+        if (a.rank === null && b.rank === null) return 0;
+        if (a.rank === null) return 1;
+        if (b.rank === null) return -1;
+        return a.rank - b.rank;
+    }
   });
 
   // Calculate complementary metrics (not redundant with Quick Filters)
@@ -1316,26 +1373,56 @@ export default function RankedRecordsPage() {
       <Container size="xl">
         <div className="space-y-6">
           {/* Header Actions */}
-          <div className="flex justify-between items-center">
-            <div className="flex gap-3">
-              <select
-                value={selectedJob}
-                onChange={(e) => setSelectedJob(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#22A555]"
-              >
-                <option value="all">All Positions</option>
-                {jobs.map((job) => (
-                  <option key={job.id} value={job.id}>
-                    {job.title}
-                  </option>
-                ))}
-              </select>
+          <div className="space-y-4">
+            {/* Row 1: Filters and Refresh */}
+            <div className="flex justify-between items-center">
+              <div className="flex gap-3">
+                <select
+                  value={selectedJob}
+                  onChange={(e) => setSelectedJob(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#22A555]"
+                >
+                  <option value="all">All Positions</option>
+                  {jobs.map((job) => (
+                    <option key={job.id} value={job.id}>
+                      {job.title}
+                    </option>
+                  ))}
+                </select>
 
-              <StatusFilter
-                value={statusFilter}
-                onChange={setStatusFilter}
+                <StatusFilter
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                />
+
+                <SortDropdown
+                  value={sortOrder}
+                  onChange={setSortOrder}
+                  options={[
+                    { value: 'highest_rank', label: 'Highest Rank' },
+                    { value: 'lowest_rank', label: 'Lowest Rank' },
+                    { value: 'newest', label: 'Newest First' },
+                    { value: 'oldest', label: 'Oldest First' },
+                  ]}
+                />
+
+                <DateRangeFilter
+                  value={dateRangeFilter}
+                  onChange={setDateRangeFilter}
+                  options={DEFAULT_DATE_RANGE_OPTIONS}
+                  label="Date applied"
+                />
+              </div>
+
+              <RefreshButton
+                onRefresh={fetchApplications}
+                label="Refresh Applications"
+                showLastRefresh={true}
               />
+            </div>
 
+            {/* Row 2: Action Buttons */}
+            <div className="flex justify-end gap-3">
               <Button
                 variant="primary"
                 icon={Award}
@@ -1369,11 +1456,6 @@ export default function RankedRecordsPage() {
                 Export to Excel
               </Button>
             </div>
-            <RefreshButton
-              onRefresh={fetchApplications}
-              label="Refresh Applications"
-              showLastRefresh={true}
-            />
           </div>
 
           {/* Summary Stats - Complementary Metrics (Non-Redundant with Quick Filters) */}
