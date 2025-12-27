@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { appendStatusHistory } from '@/lib/utils/statusHistory';
-import { notifyAdmins } from '@/lib/notifications';
+import { notifyAdmins, createNotification } from '@/lib/notifications';
 
 /**
  * Application Management API - Individual Application Operations
@@ -205,7 +205,25 @@ export async function PATCH(
       );
     }
 
-    // 7. Additional authorization check for applicants
+    // 7. Validate hired status restrictions (H3: Prevent Multi-Hire)
+    if (status === 'hired') {
+      // Check if applicant is already hired for another job
+      const { data: otherHiredJob, error: hiredCheckError } = await supabase
+        .rpc('get_applicant_hired_job', { p_applicant_id: existingApplication.applicant_id })
+        .maybeSingle();
+
+      if (otherHiredJob && otherHiredJob.job_id !== existingApplication.job_id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `This applicant is already hired for "${otherHiredJob.job_title}". Please release their hire status before hiring for another position.`
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 8. Additional authorization check for applicants
     if (profile.role === 'APPLICANT' && existingApplication.applicant_id !== user.id) {
       return NextResponse.json(
         { success: false, error: 'Forbidden - You can only withdraw your own applications' },
@@ -213,7 +231,7 @@ export async function PATCH(
       );
     }
 
-    // 8. Validate withdrawal conditions
+    // 9. Validate withdrawal conditions
     if (status === 'withdrawn') {
       if (!['pending', 'under_review'].includes(existingApplication.status)) {
         return NextResponse.json(
@@ -287,6 +305,53 @@ export async function PATCH(
         { success: false, error: updateError.message },
         { status: 500 }
       );
+    }
+
+    // 10a. Auto-deny other pending/approved applications when hired (H3: Prevent Multi-Hire)
+    if (status === 'hired') {
+      try {
+        // Get all other pending or approved applications for this applicant
+        const { data: otherApplications, error: fetchOtherError } = await supabase
+          .from('applications')
+          .select('id, job_id, status, jobs:job_id(title)')
+          .eq('applicant_id', existingApplication.applicant_id)
+          .neq('id', id)  // Exclude current application
+          .in('status', ['pending', 'approved', 'under_review', 'shortlisted', 'interviewed']);
+
+        if (otherApplications && otherApplications.length > 0) {
+          console.log(`Auto-denying ${otherApplications.length} pending/approved applications for hired applicant`);
+
+          // Auto-deny each pending application
+          for (const app of otherApplications) {
+            const autoDenyReason = `Automatically denied because applicant was hired for another position (${jobTitle})`;
+
+            await supabase
+              .from('applications')
+              .update({
+                status: 'denied',
+                denial_reason: autoDenyReason,
+                reviewed_by: user.id,
+                reviewed_at: currentTimestamp,
+                updated_at: currentTimestamp,
+              })
+              .eq('id', app.id);
+
+            // Send notification to applicant about auto-denial
+            const deniedJobTitle = (app.jobs as any)?.title || 'a position';
+            await createNotification(existingApplication.applicant_id, {
+              type: 'application_status',
+              title: 'Application Status Update',
+              message: `Your application for "${deniedJobTitle}" has been closed because you were hired for another position. Congratulations on your new role!`,
+              related_entity_type: 'application',
+              related_entity_id: app.id,
+              link_url: '/applicant/applications',
+            });
+          }
+        }
+      } catch (autoDenyError) {
+        // Don't fail the main request if auto-deny fails
+        console.error('Error auto-denying other applications:', autoDenyError);
+      }
     }
 
     // 11. Create descriptive notification for applicant

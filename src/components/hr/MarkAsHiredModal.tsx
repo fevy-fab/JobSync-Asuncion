@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui';
-import { X, Briefcase, User, TrendingUp, Calendar, FileText } from 'lucide-react';
+import { X, Briefcase, User, TrendingUp, Calendar, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import Image from 'next/image';
 
 interface Application {
@@ -76,6 +76,39 @@ export const MarkAsHiredModal: React.FC<MarkAsHiredModalProps> = ({
                 <p className="text-sm text-teal-700">
                   Confirm that this applicant has been officially hired. They will receive a welcome notification.
                 </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Warning about Multi-Hire Restrictions */}
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-amber-900 mb-2">Important: Multi-Hire Restrictions</h4>
+                <p className="text-sm text-amber-800 mb-3">
+                  When you mark this applicant as hired, the following will happen automatically:
+                </p>
+                <ul className="space-y-2 text-sm text-amber-700">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span><strong>All other pending applications</strong> from this applicant will be automatically denied</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>Applicant will be <strong>blocked from applying to new positions</strong> until their hire status is released</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>Applicant will receive notifications about all auto-denied applications</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>To allow re-applications, use <strong>"Release Hire Status"</strong> action from the Actions menu</span>
+                  </li>
+                </ul>
               </div>
             </div>
           </div>

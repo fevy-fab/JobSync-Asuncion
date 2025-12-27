@@ -14,6 +14,7 @@ import { ShortlistModal } from '@/components/hr/ShortlistModal';
 import { ScheduleInterviewModal } from '@/components/hr/ScheduleInterviewModal';
 import { ApproveModal } from '@/components/hr/ApproveModal';
 import { MarkAsHiredModal } from '@/components/hr/MarkAsHiredModal';
+import { ReleaseHireModal } from '@/components/hr/ReleaseHireModal';
 import { UnderReviewModal } from '@/components/hr/UnderReviewModal';
 import { ReverseToPendingModal } from '@/components/hr/ReverseToPendingModal';
 import { ArchiveModal } from '@/components/hr/ArchiveModal';
@@ -50,6 +51,7 @@ import {
   Archive,
   Target,
   History,
+  Unlock,
 } from 'lucide-react';
 import { StatusTimeline } from '@/components/hr/StatusTimeline';
 
@@ -141,6 +143,7 @@ export default function RankedRecordsPage() {
   const [showScheduleInterviewModal, setShowScheduleInterviewModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showMarkAsHiredModal, setShowMarkAsHiredModal] = useState(false);
+  const [showReleaseHireModal, setShowReleaseHireModal] = useState(false);
   const [showUnderReviewModal, setShowUnderReviewModal] = useState(false);
   const [showReverseToPendingModal, setShowReverseToPendingModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
@@ -553,6 +556,43 @@ export default function RankedRecordsPage() {
     } catch (error) {
       console.error('Error marking as hired:', error);
       showToast('Failed to mark as hired', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Release Hire Status
+  const handleReleaseHire = (application: Application) => {
+    setSelectedApplicationForAction(application);
+    setShowReleaseHireModal(true);
+  };
+
+  const handleReleaseHireConfirm = async (release_reason: string) => {
+    if (!selectedApplicationForAction) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/applications/${selectedApplicationForAction.id}/release-hire`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          release_reason,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(`Hire status released for ${selectedApplicationForAction.applicantName}`, 'success');
+        setShowReleaseHireModal(false);
+        setSelectedApplicationForAction(null);
+        fetchApplications();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error releasing hire status:', error);
+      showToast('Failed to release hire status', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1273,6 +1313,13 @@ export default function RankedRecordsPage() {
 
           case 'hired':
             menuItems.push(
+              {
+                label: 'Release Hire Status',
+                icon: Unlock,
+                onClick: () => handleReleaseHire(row),
+                variant: 'success',
+                disabled: submitting,
+              },
               {
                 label: 'Archive',
                 icon: Archive,
@@ -1999,6 +2046,20 @@ export default function RankedRecordsPage() {
         }}
         application={selectedApplicationForAction}
         onConfirm={handleMarkAsHiredConfirm}
+        submitting={submitting}
+      />
+
+      {/* Release Hire Modal */}
+      <ReleaseHireModal
+        isOpen={showReleaseHireModal}
+        onClose={() => {
+          setShowReleaseHireModal(false);
+          setSelectedApplicationForAction(null);
+        }}
+        applicantName={selectedApplicationForAction?.applicantName || ''}
+        jobTitle={selectedApplicationForAction?.jobTitle || ''}
+        applicationId={selectedApplicationForAction?.id || ''}
+        onConfirm={handleReleaseHireConfirm}
         submitting={submitting}
       />
 

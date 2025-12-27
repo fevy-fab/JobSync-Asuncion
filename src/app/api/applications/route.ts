@@ -453,7 +453,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 6. Check for duplicate application (exclude withdrawn and denied applications)
+    // 6. Check if applicant is currently hired for another job (H3: Hired Status Restrictions)
+    const { data: hiredJob, error: hiredCheckError } = await supabase
+      .rpc('get_applicant_hired_job', { p_applicant_id: user.id })
+      .maybeSingle();
+
+    if (hiredJob) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `You have already been hired for "${hiredJob.job_title}". Please complete that position before applying to new roles.`
+        },
+        { status: 403 }
+      );
+    }
+
+    // 7. Check for duplicate application (exclude withdrawn and denied applications)
     const { data: existingApplication, error: duplicateError } = await supabase
       .from('applications')
       .select('id, status')
@@ -469,7 +484,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 7. Check if applicant_profile exists, create if not
+    // 8. Check if applicant_profile exists, create if not
     let applicantProfileId: string;
 
     const { data: existingProfile, error: profileCheckError } = await supabase
@@ -506,7 +521,7 @@ export async function POST(request: NextRequest) {
       applicantProfileId = newProfile.id;
     }
 
-    // 8. Create application
+    // 9. Create application
     const currentTimestamp = new Date().toISOString();
     const insertData = {
       job_id,
@@ -545,10 +560,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 9. Ranking will be triggered manually by HR via "Rank Applicants" button
+    // 10. Ranking will be triggered manually by HR via "Rank Applicants" button
     // No automatic ranking on submission - HR has full control
 
-    // 10. Send notifications to all relevant parties
+    // 11. Send notifications to all relevant parties
     try {
       // Notify applicant of successful submission
       await createNotification(profile.id, {
@@ -561,7 +576,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Notify job creator (HR) of new application
-      await notifyJobCreator(jobId, profile.full_name);
+      await notifyJobCreator(job_id, profile.full_name);
 
       // Notify ADMIN of new application for system monitoring
       await notifyAdmins({
