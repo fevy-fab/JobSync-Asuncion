@@ -3,7 +3,7 @@ import { CheckCircle, Clock, XCircle, Eye, Star, Calendar, Briefcase, Archive, A
 import { getStatusConfig as getCentralizedStatusConfig } from '@/lib/config/statusConfig';
 
 interface ApplicationStatusBadgeProps {
-  status: 'pending' | 'under_review' | 'shortlisted' | 'interviewed' | 'approved' | 'denied' | 'hired' | 'archived' | 'withdrawn';
+  status: 'pending' | 'under_review' | 'shortlisted' | 'interviewed' | 'approved' | 'denied' | 'hired' | 'archived' | 'withdrawn' | 're_routed';
   createdAt: string;
   matchScore?: number | null;
   className?: string;

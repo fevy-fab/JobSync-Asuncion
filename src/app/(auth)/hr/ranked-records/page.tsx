@@ -19,6 +19,7 @@ import { UnderReviewModal } from '@/components/hr/UnderReviewModal';
 import { ReverseToPendingModal } from '@/components/hr/ReverseToPendingModal';
 import { ArchiveModal } from '@/components/hr/ArchiveModal';
 import { AutoDenyModal } from '@/components/hr/AutoDenyModal';
+import { ReRoutingConfirmModal } from '@/components/hr/ReRoutingConfirmModal';
 import { ApplicationDrawer } from '@/components/hr/ApplicationDrawer';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
@@ -52,6 +53,7 @@ import {
   Target,
   History,
   Unlock,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { StatusTimeline } from '@/components/hr/StatusTimeline';
 
@@ -148,6 +150,7 @@ export default function RankedRecordsPage() {
   const [showReverseToPendingModal, setShowReverseToPendingModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [showAutoDenyModal, setShowAutoDenyModal] = useState(false);
+  const [showReRoutingModal, setShowReRoutingModal] = useState(false);
   const [selectedApplicationForAction, setSelectedApplicationForAction] = useState<Application | null>(null);
 
   // Status History Modal
@@ -517,6 +520,43 @@ export default function RankedRecordsPage() {
     } catch (error) {
       console.error('Error auto-denying remaining applicants:', error);
       showToast('Failed to close job and deny remaining applicants', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Re-route Remaining Applicants
+  const handleReRoutingConfirm = async (customReason?: string) => {
+    if (selectedJob === 'all') {
+      showToast('Please select a specific job first', 'error');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/jobs/${selectedJob}/re-route-remaining`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customReason }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const summary = `Successfully re-routed ${result.reRoutedCount} applicant(s)${
+          result.deniedCount > 0 ? `, denied ${result.deniedCount} (no alternatives found)` : ''
+        }${
+          result.skippedCount > 0 ? `, skipped ${result.skippedCount} (re-routing limit reached)` : ''
+        }`;
+        showToast(summary, 'success');
+        setShowReRoutingModal(false);
+        fetchApplications(); // Refresh to show updated statuses
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error re-routing remaining applicants:', error);
+      showToast('Failed to re-route remaining applicants', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1517,6 +1557,20 @@ export default function RankedRecordsPage() {
               </Button>
 
               <Button
+                variant="primary"
+                icon={ArrowRightLeft}
+                onClick={() => setShowReRoutingModal(true)}
+                disabled={selectedJob === 'all'}
+                className="whitespace-nowrap bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+              >
+                Re-route Remaining {selectedJob !== 'all' && applications.filter(app =>
+                  app._raw?.job_id === selectedJob && (app.status === 'pending' || app.status === 'under_review')
+                ).length > 0 && `(${applications.filter(app =>
+                  app._raw?.job_id === selectedJob && (app.status === 'pending' || app.status === 'under_review')
+                ).length})`}
+              </Button>
+
+              <Button
                 variant="danger"
                 icon={XCircle}
                 onClick={() => setShowAutoDenyModal(true)}
@@ -2109,6 +2163,19 @@ export default function RankedRecordsPage() {
           app._raw?.job_id === selectedJob && app.status === 'pending'
         ).length}
         onConfirm={handleAutoDenyConfirm}
+        submitting={submitting}
+      />
+
+      {/* Re-routing Remaining Applicants Modal */}
+      <ReRoutingConfirmModal
+        isOpen={showReRoutingModal}
+        onClose={() => setShowReRoutingModal(false)}
+        jobTitle={jobs.find(j => j.id === selectedJob)?.title || 'Unknown Job'}
+        jobId={selectedJob}
+        pendingCount={applications.filter(app =>
+          app._raw?.job_id === selectedJob && (app.status === 'pending' || app.status === 'under_review')
+        ).length}
+        onConfirm={handleReRoutingConfirm}
         submitting={submitting}
       />
 

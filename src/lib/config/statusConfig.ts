@@ -1,4 +1,4 @@
-import { CheckCircle, CheckCircle2, Clock, XCircle, Eye, Star, Calendar, Briefcase, Archive, AlertCircle, UserCheck, Play, PlayCircle, Award, Ban } from 'lucide-react';
+import { CheckCircle, CheckCircle2, Clock, XCircle, Eye, Star, Calendar, Briefcase, Archive, AlertCircle, UserCheck, Play, PlayCircle, Award, Ban, ArrowRightLeft } from 'lucide-react';
 
 /**
  * Centralized Status Configuration
@@ -16,7 +16,8 @@ export type JobStatus =
   | 'denied'
   | 'hired'
   | 'archived'
-  | 'withdrawn';
+  | 'withdrawn'
+  | 're_routed';
 
 export type TrainingStatus =
   | 'pending'
@@ -141,6 +142,15 @@ export const STATUS_CONFIG: Record<string, StatusConfig> = {
     borderColor: 'border-teal-600',
     badgeVariant: 'teal',
     legacyColor: 'bg-teal-100 text-teal-800 border-teal-200',
+  },
+  re_routed: {
+    label: 'Re-routed',
+    icon: ArrowRightLeft,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-100',
+    borderColor: 'border-purple-600',
+    badgeVariant: 'primary',
+    legacyColor: 'bg-purple-100 text-purple-800 border-purple-200',
   },
 
   // Training-specific statuses

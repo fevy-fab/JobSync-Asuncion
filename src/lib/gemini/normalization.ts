@@ -74,6 +74,11 @@ let bgeCanonicalEmbeddingsLoadingPromise: Promise<void> | null = null;
 let dictionariesLoaded = false;
 let dictionariesLoadingPromise: Promise<void> | null = null;
 
+// ✅ PHASE 1: Normalization result caches to reduce Gemini API calls
+// Cache normalization results to avoid re-normalizing same values (e.g., job requirements for every applicant)
+const degreeNormalizationCache: Map<string, NormalizationResult> = new Map();
+const eligibilityNormalizationCache: Map<string, NormalizationResult> = new Map();
+
 // BGE-M3 similarity thresholds.
 // For JobSync, we prefer precision: better UNKNOWN than wrong mapping.
 const BGE_STRONG_THRESHOLD =
@@ -711,27 +716,38 @@ export async function normalizeDegreeValue(
     };
   }
 
+  // ✅ CHECK CACHE FIRST (reduce redundant API calls for same job requirements)
+  const cacheKey = normalizeKey(rawDegree);
+  const cached = degreeNormalizationCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   // 1) Fast alias/dictionary check
   const dictHit = normalizeDegreeWithDictionary(rawDegree);
   if (dictHit) {
-    return {
+    const result: NormalizationResult = {
       canonicalKey: dictHit.key,
       method: 'dictionary',
       confidence: 1,
       raw: rawDegree,
     };
+    degreeNormalizationCache.set(cacheKey, result);
+    return result;
   }
 
   // 2) BGE-M3 embedding fallback
   try {
     const bgeHit = await findBestDegreeByEmbedding(rawDegree);
     if (bgeHit) {
-      return {
+      const result: NormalizationResult = {
         canonicalKey: bgeHit.canonicalKey,
         method: 'embedding',
         confidence: bgeHit.confidence,
         raw: rawDegree,
       };
+      degreeNormalizationCache.set(cacheKey, result);
+      return result;
     }
   } catch (err) {
     console.error('[JobSync] BGE-M3 degree normalization failed, skipping to Gemini:', err);
@@ -740,56 +756,66 @@ export async function normalizeDegreeValue(
   // 3) Gemini classifier fallback
   const candidates = getTopDegreeCandidates(rawDegree, 20);
   if (!candidates.length) {
-    return {
+    const result: NormalizationResult = {
       canonicalKey: undefined,
       method: 'fallback',
       confidence: 0,
       raw: rawDegree,
     };
+    degreeNormalizationCache.set(cacheKey, result);
+    return result;
   }
 
   const prompt = buildDegreeClassificationPrompt(rawDegree, candidates);
 
   try {
     // Use a fast, free-ish Gemini model for classification
-    const text = await generateContent(prompt, 'gemini-2.0-flash-exp');
+    const text = await generateContent(prompt, 'gemini-2.0-flash');
     const parsed = parseGeminiJSON<GeminiDegreeClassificationResponse>(text);
 
     const key = parsed.canonical_key;
     if (!key || key === 'UNKNOWN') {
-      return {
+      const result: NormalizationResult = {
         canonicalKey: undefined,
         method: 'gemini',
         confidence: parsed.confidence ?? 0.3,
         raw: rawDegree,
       };
+      degreeNormalizationCache.set(cacheKey, result);
+      return result;
     }
 
     const degree = degreesByKey.get(key);
     if (!degree) {
       // Gemini returned a key that does not exist in our config; ignore
-      return {
+      const result: NormalizationResult = {
         canonicalKey: undefined,
         method: 'gemini',
         confidence: parsed.confidence ?? 0.2,
         raw: rawDegree,
       };
+      degreeNormalizationCache.set(cacheKey, result);
+      return result;
     }
 
-    return {
+    const result: NormalizationResult = {
       canonicalKey: key,
       method: 'gemini',
       confidence: parsed.confidence ?? 0.8,
       raw: rawDegree,
     };
+    degreeNormalizationCache.set(cacheKey, result);
+    return result;
   } catch (err) {
     console.error('[JobSync] Gemini degree normalization failed:', err);
-    return {
+    const result: NormalizationResult = {
       canonicalKey: undefined,
       method: 'fallback',
       confidence: 0,
       raw: rawDegree,
     };
+    degreeNormalizationCache.set(cacheKey, result);
+    return result;
   }
 }
 
@@ -813,27 +839,38 @@ export async function normalizeEligibilityValue(
     };
   }
 
+  // ✅ CHECK CACHE FIRST (reduce redundant API calls for same job requirements)
+  const cacheKey = normalizeKey(rawEligibility);
+  const cached = eligibilityNormalizationCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
   // 1) Fast alias/dictionary check
   const dictHit = normalizeEligibilityWithDictionary(rawEligibility);
   if (dictHit) {
-    return {
+    const result: NormalizationResult = {
       canonicalKey: dictHit.key,
       method: 'dictionary',
       confidence: 1,
       raw: rawEligibility,
     };
+    eligibilityNormalizationCache.set(cacheKey, result);
+    return result;
   }
 
   // 2) BGE-M3 embedding fallback
   try {
     const bgeHit = await findBestEligibilityByEmbedding(rawEligibility);
     if (bgeHit) {
-      return {
+      const result: NormalizationResult = {
         canonicalKey: bgeHit.canonicalKey,
         method: 'embedding',
         confidence: bgeHit.confidence,
         raw: rawEligibility,
       };
+      eligibilityNormalizationCache.set(cacheKey, result);
+      return result;
     }
   } catch (err) {
     console.error(
@@ -845,54 +882,64 @@ export async function normalizeEligibilityValue(
   // 3) Gemini classifier fallback
   const candidates = getTopEligibilityCandidates(rawEligibility, 20);
   if (!candidates.length) {
-    return {
+    const result: NormalizationResult = {
       canonicalKey: undefined,
       method: 'fallback',
       confidence: 0,
       raw: rawEligibility,
     };
+    eligibilityNormalizationCache.set(cacheKey, result);
+    return result;
   }
 
   const prompt = buildEligibilityClassificationPrompt(rawEligibility, candidates);
 
   try {
-    const text = await generateContent(prompt, 'gemini-2.0-flash-exp');
+    const text = await generateContent(prompt, 'gemini-2.0-flash');
     const parsed = parseGeminiJSON<GeminiEligibilityClassificationResponse>(text);
 
     const key = parsed.canonical_key;
     if (!key || key === 'UNKNOWN') {
-      return {
+      const result: NormalizationResult = {
         canonicalKey: undefined,
         method: 'gemini',
         confidence: parsed.confidence ?? 0.3,
         raw: rawEligibility,
       };
+      eligibilityNormalizationCache.set(cacheKey, result);
+      return result;
     }
 
     const eligibility = eligibilitiesByKey.get(key);
     if (!eligibility) {
-      return {
+      const result: NormalizationResult = {
         canonicalKey: undefined,
         method: 'gemini',
         confidence: parsed.confidence ?? 0.2,
         raw: rawEligibility,
       };
+      eligibilityNormalizationCache.set(cacheKey, result);
+      return result;
     }
 
-    return {
+    const result: NormalizationResult = {
       canonicalKey: key,
       method: 'gemini',
       confidence: parsed.confidence ?? 0.8,
       raw: rawEligibility,
     };
+    eligibilityNormalizationCache.set(cacheKey, result);
+    return result;
   } catch (err) {
     console.error('[JobSync] Gemini eligibility normalization failed:', err);
-    return {
+    const result: NormalizationResult = {
       canonicalKey: undefined,
       method: 'fallback',
       confidence: 0,
       raw: rawEligibility,
     };
+    eligibilityNormalizationCache.set(cacheKey, result);
+    return result;
   }
 }
 

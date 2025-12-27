@@ -305,11 +305,18 @@ export type Database = {
           interview_date: string | null
           job_id: string
           match_score: number | null
+          matched_eligibilities_count: number | null
+          matched_skills_count: number | null
           next_steps: string | null
           notification_sent: boolean | null
           pds_id: string | null
           rank: number | null
           ranking_reasoning: string | null
+          re_routed_at: string | null
+          re_routed_by: string | null
+          re_routed_from_job_id: string | null
+          re_routed_to_job_id: string | null
+          re_routing_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           skills_score: number | null
@@ -334,11 +341,18 @@ export type Database = {
           interview_date?: string | null
           job_id: string
           match_score?: number | null
+          matched_eligibilities_count?: number | null
+          matched_skills_count?: number | null
           next_steps?: string | null
           notification_sent?: boolean | null
           pds_id?: string | null
           rank?: number | null
           ranking_reasoning?: string | null
+          re_routed_at?: string | null
+          re_routed_by?: string | null
+          re_routed_from_job_id?: string | null
+          re_routed_to_job_id?: string | null
+          re_routing_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           skills_score?: number | null
@@ -363,11 +377,18 @@ export type Database = {
           interview_date?: string | null
           job_id?: string
           match_score?: number | null
+          matched_eligibilities_count?: number | null
+          matched_skills_count?: number | null
           next_steps?: string | null
           notification_sent?: boolean | null
           pds_id?: string | null
           rank?: number | null
           ranking_reasoning?: string | null
+          re_routed_at?: string | null
+          re_routed_by?: string | null
+          re_routed_from_job_id?: string | null
+          re_routed_to_job_id?: string | null
+          re_routing_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           skills_score?: number | null
@@ -2120,6 +2141,7 @@ export type Database = {
         | "hired"
         | "archived"
         | "withdrawn"
+        | "re_routed"
         | "enrolled"
         | "in_progress"
         | "completed"
@@ -2294,6 +2316,7 @@ export const Constants = {
         "hired",
         "archived",
         "withdrawn",
+        "re_routed",
         "enrolled",
         "in_progress",
         "completed",

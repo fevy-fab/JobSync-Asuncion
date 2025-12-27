@@ -73,9 +73,30 @@ export async function rankApplicantsForJob(
     workExperienceTitles?: string[];
   }>
 ): Promise<RankedApplicant[]> {
-  // Score all applicants (now async because of normalization + Gemini + SBERT)
-  const scoredApplicants = await Promise.all(
-    applicants.map(async applicant => {
+  // ✅ PHASE 2: Batched processing to stay within Gemini API rate limits
+  // Process applicants in batches to avoid overwhelming the API
+  const BATCH_SIZE = 5; // Process 5 applicants at a time
+  const DELAY_BETWEEN_BATCHES_MS = 2000; // 2 second delay between batches
+
+  const scoredApplicants: Array<{
+    applicantId: string;
+    applicantName: string;
+    matchScore: number;
+    educationScore: number;
+    experienceScore: number;
+    skillsScore: number;
+    eligibilityScore: number;
+    algorithmUsed: string;
+    rankingReasoning: string;
+    algorithmDetails: AlgorithmDetails;
+    matchedSkillsCount: number;
+    matchedEligibilitiesCount: number;
+  }> = [];
+
+  // Score all applicants in batches (with caching, most API calls are now avoided)
+  for (let i = 0; i < applicants.length; i += BATCH_SIZE) {
+    const batch = applicants.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(async applicant => {
       const jobReq: JobRequirements = {
         title: job.title,
         description: job.description,
@@ -143,8 +164,16 @@ export async function rankApplicantsForJob(
         ...score,
         algorithmDetails,
       };
-    })
-  );
+    }));
+
+    scoredApplicants.push(...batchResults);
+
+    // Add delay between batches (except after the last batch)
+    if (i + BATCH_SIZE < applicants.length) {
+      console.log(`   ⏳ Processed ${i + batchResults.length}/${applicants.length} applicants, waiting ${DELAY_BETWEEN_BATCHES_MS}ms before next batch...`);
+      await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES_MS));
+    }
+  }
 
   // Sort by total score (descending) with tie-breaking (unchanged)
   const sortedApplicants = scoredApplicants.sort((a, b) => {
@@ -275,7 +304,7 @@ async function addGeminiInsights(
   job: any,
   topCandidates: RankedApplicant[]
 ): Promise<void> {
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' }); // ✅ Using stable Gemini 2.0 Flash
 
   const prompt = `You are an HR expert analyzing job applicants.
 

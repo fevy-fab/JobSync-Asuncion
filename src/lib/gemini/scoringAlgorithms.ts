@@ -672,8 +672,16 @@ async function calculateSkillMatch(
   jobSkills: string[],
   applicantSkills: string[]
 ): Promise<{ score: number; matchedCount: number }> {
+  // DEFENSIVE: Ensure arrays and filter non-strings
+  const safeJobSkills = Array.isArray(jobSkills)
+    ? jobSkills.filter(s => typeof s === 'string' && s.trim())
+    : [];
+  const safeApplicantSkills = Array.isArray(applicantSkills)
+    ? applicantSkills.filter(s => typeof s === 'string' && s.trim())
+    : [];
+
   const jobMap = new Map<string, string>();
-  for (const s of jobSkills) {
+  for (const s of safeJobSkills) {
     const key = s.toLowerCase().trim();
     if (!key) continue;
     if (!jobMap.has(key)) jobMap.set(key, s);
@@ -696,7 +704,7 @@ async function calculateSkillMatch(
   });
 
   const applicantMap = new Map<string, string>();
-  for (const s of applicantSkills) {
+  for (const s of safeApplicantSkills) {
     const key = s.toLowerCase().trim();
     if (!key) continue;
     if (!applicantMap.has(key)) applicantMap.set(key, s);

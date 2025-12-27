@@ -15,6 +15,8 @@ import {
   Star,
   Trophy,
   BarChart3,
+  ArrowRightLeft,
+  Clock,
 } from 'lucide-react';
 import {
   getPercentileText,
@@ -157,6 +159,11 @@ interface RankingDetailsModalProps {
     topPerformers?: TopPerformer[];
     totalApplicants?: number;
     hr_notes?: string | null;
+    re_routed_from_job_id?: string | null;
+    re_routed_to_job_id?: string | null;
+    re_routed_at?: string | null;
+    re_routing_reason?: string | null;
+    status?: string;
   } | null;
   jobRequirements?: {
     degreeRequirement: string;
@@ -1628,6 +1635,66 @@ export function RankingDetailsModal({
             </div>
             <p className="text-xs text-amber-700 mt-2 italic">
               These notes are for HR reference only and are not visible to the applicant.
+            </p>
+          </div>
+        )}
+
+        {/* Re-routing Information */}
+        {(applicant.status === 're_routed' || applicant.re_routed_from_job_id || applicant.re_routed_to_job_id) && (
+          <div className="mt-6 p-5 bg-gradient-to-br from-purple-50 to-indigo-100 rounded-xl border-2 border-purple-200">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-purple-600" />
+              Re-routing Information
+            </h3>
+            <div className="space-y-3">
+              {applicant.status === 're_routed' && applicant.re_routed_to_job_id && (
+                <div className="bg-white rounded-lg p-4 border border-purple-200">
+                  <p className="text-sm font-medium text-purple-900 mb-2">
+                    This application was re-routed to an alternative position
+                  </p>
+                  {applicant.re_routing_reason && (
+                    <div className="bg-purple-50 rounded-lg p-3 mb-3">
+                      <p className="text-xs font-semibold text-purple-700 mb-1">AI Reasoning:</p>
+                      <p className="text-sm text-purple-800 leading-relaxed">
+                        {applicant.re_routing_reason}
+                      </p>
+                    </div>
+                  )}
+                  {applicant.re_routed_at && (
+                    <p className="text-xs text-gray-600 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      Re-routed on {new Date(applicant.re_routed_at).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  )}
+                </div>
+              )}
+              {applicant.re_routed_from_job_id && (
+                <div className="bg-white rounded-lg p-4 border border-purple-200">
+                  <p className="text-sm font-medium text-purple-900 mb-2">
+                    This is a re-routed application
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    The applicant was originally applied to another position and was automatically matched to this job by our AI system.
+                  </p>
+                  {applicant.re_routing_reason && (
+                    <div className="bg-purple-50 rounded-lg p-3 mt-3">
+                      <p className="text-xs font-semibold text-purple-700 mb-1">Match Reasoning:</p>
+                      <p className="text-sm text-purple-800 leading-relaxed">
+                        {applicant.re_routing_reason}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-purple-700 mt-3 italic">
+              Re-routing uses Gemini AI to find the best alternative job matches based on applicant qualifications.
             </p>
           </div>
         )}
