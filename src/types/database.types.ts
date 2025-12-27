@@ -2135,7 +2135,7 @@ export type Database = {
         | "training"
         | "system"
       event_status: "success" | "failed"
-      job_status: "active" | "hidden" | "archived"
+      job_status: "active" | "hidden" | "archived" | "closed"
       notification_type:
         | "application_status"
         | "training_status"
@@ -2311,7 +2311,7 @@ export const Constants = {
         "system",
       ],
       event_status: ["success", "failed"],
-      job_status: ["active", "hidden", "archived"],
+      job_status: ["active", "hidden", "archived", "closed"],
       notification_type: [
         "application_status",
         "training_status",

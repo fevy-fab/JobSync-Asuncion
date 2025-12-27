@@ -17,6 +17,7 @@ import { MarkAsHiredModal } from '@/components/hr/MarkAsHiredModal';
 import { UnderReviewModal } from '@/components/hr/UnderReviewModal';
 import { ReverseToPendingModal } from '@/components/hr/ReverseToPendingModal';
 import { ArchiveModal } from '@/components/hr/ArchiveModal';
+import { AutoDenyModal } from '@/components/hr/AutoDenyModal';
 import { ApplicationDrawer } from '@/components/hr/ApplicationDrawer';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
@@ -143,6 +144,7 @@ export default function RankedRecordsPage() {
   const [showUnderReviewModal, setShowUnderReviewModal] = useState(false);
   const [showReverseToPendingModal, setShowReverseToPendingModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showAutoDenyModal, setShowAutoDenyModal] = useState(false);
   const [selectedApplicationForAction, setSelectedApplicationForAction] = useState<Application | null>(null);
 
   // Status History Modal
@@ -480,6 +482,38 @@ export default function RankedRecordsPage() {
     } catch (error) {
       console.error('Error denying application:', error);
       showToast('Failed to deny application', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Auto-Deny Remaining Applicants
+  const handleAutoDenyConfirm = async (reason: string) => {
+    if (selectedJob === 'all') {
+      showToast('Please select a specific job first', 'error');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/jobs/${selectedJob}/auto-deny-remaining`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast(result.message, 'success');
+        setShowAutoDenyModal(false);
+        fetchApplications(); // Refresh to show updated statuses
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      console.error('Error auto-denying remaining applicants:', error);
+      showToast('Failed to close job and deny remaining applicants', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1436,6 +1470,20 @@ export default function RankedRecordsPage() {
               </Button>
 
               <Button
+                variant="danger"
+                icon={XCircle}
+                onClick={() => setShowAutoDenyModal(true)}
+                disabled={selectedJob === 'all'}
+                className="whitespace-nowrap"
+              >
+                Close Job & Deny Remaining {selectedJob !== 'all' && applications.filter(app =>
+                  app._raw?.job_id === selectedJob && app.status === 'pending'
+                ).length > 0 && `(${applications.filter(app =>
+                  app._raw?.job_id === selectedJob && app.status === 'pending'
+                ).length})`}
+              </Button>
+
+              <Button
                 variant="success"
                 icon={Download}
                 onClick={() => {
@@ -1987,6 +2035,19 @@ export default function RankedRecordsPage() {
         }}
         application={selectedApplicationForAction}
         onConfirm={handleArchiveConfirm}
+        submitting={submitting}
+      />
+
+      {/* Auto-Deny Remaining Applicants Modal */}
+      <AutoDenyModal
+        isOpen={showAutoDenyModal}
+        onClose={() => setShowAutoDenyModal(false)}
+        jobTitle={jobs.find(j => j.id === selectedJob)?.title || 'Unknown Job'}
+        jobId={selectedJob}
+        pendingCount={applications.filter(app =>
+          app._raw?.job_id === selectedJob && app.status === 'pending'
+        ).length}
+        onConfirm={handleAutoDenyConfirm}
         submitting={submitting}
       />
 

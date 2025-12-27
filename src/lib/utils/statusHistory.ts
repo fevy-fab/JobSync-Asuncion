@@ -8,6 +8,7 @@ export interface StatusHistoryEntry {
   to: string;
   changed_at: string;
   changed_by?: string;
+  reason?: string;  // Optional reason for status change (e.g., denial reason)
 }
 
 /**
@@ -73,4 +74,29 @@ export function isValidStatusHistory(history: any): history is StatusHistoryEntr
       typeof entry.changed_at === 'string'
     );
   });
+}
+
+/**
+ * Creates a single status transition entry
+ * @param fromStatus - Previous status
+ * @param toStatus - New status
+ * @param timestamp - When the change occurred
+ * @param userId - ID of user making the change (optional)
+ * @param reason - Reason for the status change (optional)
+ * @returns Status history entry
+ */
+export function createStatusTransition(
+  fromStatus: string | null,
+  toStatus: string,
+  timestamp: string,
+  userId?: string,
+  reason?: string
+): StatusHistoryEntry {
+  return {
+    from: fromStatus,
+    to: toStatus,
+    changed_at: timestamp,
+    ...(userId && { changed_by: userId }),
+    ...(reason && { reason }),
+  };
 }

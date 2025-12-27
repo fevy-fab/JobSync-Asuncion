@@ -31,7 +31,9 @@ import {
   Eye,
   Archive,
   Filter,
+  Lock,
 } from 'lucide-react';
+import { JobStatusBadge } from '@/components/JobStatusBadge';
 
 interface Job {
   id: string;
@@ -55,16 +57,18 @@ export default function JobManagementPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showHideConfirm, setShowHideConfirm] = useState(false);
   const [showUnhideConfirm, setShowUnhideConfirm] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editingJob, setEditingJob] = useState<any>(null);
   const [jobToHide, setJobToHide] = useState<Job | null>(null);
   const [jobToUnhide, setJobToUnhide] = useState<Job | null>(null);
+  const [jobToClose, setJobToClose] = useState<Job | null>(null);
   const [jobToArchive, setJobToArchive] = useState<Job | null>(null);
   const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [applicationCount, setApplicationCount] = useState<number>(0);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden' | 'archived'>(
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden' | 'closed' | 'archived'>(
     'all'
   );
   const [expandedSkillsCards, setExpandedSkillsCards] = useState<Set<string>>(new Set());
@@ -107,6 +111,8 @@ export default function JobManagementPage() {
                 ? 'Active'
                 : job.status === 'hidden'
                 ? 'Hidden'
+                : job.status === 'closed'
+                ? 'Closed'
                 : 'Archived',
             _raw: job,
           }))
@@ -363,6 +369,35 @@ Employment Type: ${formData.employment_type}
     }
   };
 
+  // Close job (mark as closed)
+  const handleClose = async () => {
+    if (!jobToClose) return;
+
+    try {
+      setSubmitting(true);
+      const response = await fetch(`/api/jobs/${jobToClose.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'closed' }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showToast('Job closed successfully', 'success');
+        setShowCloseConfirm(false);
+        setJobToClose(null);
+        fetchJobs();
+      } else {
+        showToast(getErrorMessage(result.error), 'error');
+      }
+    } catch (error) {
+      showToast('Failed to close job', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   // Archive job (soft delete)
   const handleArchive = async () => {
     if (!jobToArchive) return;
@@ -538,25 +573,13 @@ Employment Type: ${formData.employment_type}
       header: 'Status',
       accessor: 'status' as const,
       render: (value: string) => {
-        if (value === 'Active') {
-          return (
-            <Badge variant="success" icon={CheckCircle2} className="font-medium">
-              Active
-            </Badge>
-          );
-        } else if (value === 'Hidden') {
-          return (
-            <Badge variant="warning" icon={EyeOff} className="font-medium">
-              Hidden from Applicants
-            </Badge>
-          );
-        } else {
-          return (
-            <Badge variant="default" icon={Archive} className="font-medium">
-              Archived
-            </Badge>
-          );
-        }
+        const statusMap: Record<string, 'active' | 'hidden' | 'closed' | 'archived'> = {
+          'Active': 'active',
+          'Hidden': 'hidden',
+          'Closed': 'closed',
+          'Archived': 'archived'
+        };
+        return <JobStatusBadge status={statusMap[value] || 'active'} size="md" />;
       },
     },
     {
@@ -565,6 +588,7 @@ Employment Type: ${formData.employment_type}
       render: (_: any, row: Job) => {
         const isActive = row.status === 'Active';
         const isHidden = row.status === 'Hidden';
+        const isClosed = row.status === 'Closed';
         const isArchived = row.status === 'Archived';
 
         const menuItems: DropdownMenuItem[] = [
@@ -573,7 +597,7 @@ Employment Type: ${formData.employment_type}
             icon: Edit,
             onClick: () => handleEdit(row),
             variant: 'warning',
-            hidden: isArchived,
+            hidden: isArchived || isClosed,
           },
           {
             label: 'Hide from Applicants',
@@ -586,7 +610,17 @@ Employment Type: ${formData.employment_type}
             hidden: !isActive,
           },
           {
-            label: isArchived ? 'Restore to Active' : 'Unhide Job',
+            label: 'Close Hiring',
+            icon: Lock,
+            onClick: () => {
+              setJobToClose(row);
+              setShowCloseConfirm(true);
+            },
+            variant: 'danger',
+            hidden: !isActive && !isHidden,
+          },
+          {
+            label: isArchived ? 'Restore to Active' : isClosed ? 'Reopen Job' : 'Unhide Job',
             icon: Eye,
             onClick: () => {
               setJobToUnhide(row);
@@ -628,6 +662,7 @@ Employment Type: ${formData.employment_type}
     if (statusFilter === 'all') return true;
     if (statusFilter === 'active') return job.status === 'Active';
     if (statusFilter === 'hidden') return job.status === 'Hidden';
+    if (statusFilter === 'closed') return job.status === 'Closed';
     if (statusFilter === 'archived') return job.status === 'Archived';
     return true;
   });
@@ -635,6 +670,7 @@ Employment Type: ${formData.employment_type}
   // Calculate stats
   const activeCount = jobs.filter(j => j.status === 'Active').length;
   const hiddenCount = jobs.filter(j => j.status === 'Hidden').length;
+  const closedCount = jobs.filter(j => j.status === 'Closed').length;
   const archivedCount = jobs.filter(j => j.status === 'Archived').length;
   const totalCount = jobs.length;
 
@@ -661,7 +697,7 @@ Employment Type: ${formData.employment_type}
           </div>
 
           {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {/* Active Jobs */}
             <Card
               variant="flat"
@@ -690,6 +726,22 @@ Employment Type: ${formData.employment_type}
                 </div>
                 <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center shadow-lg">
                   <EyeOff className="w-6 h-6 text-white" />
+                </div>
+              </div>
+            </Card>
+
+            {/* Closed Jobs */}
+            <Card
+              variant="flat"
+              className="bg-gradient-to-br from-red-50 to-red-100 border-l-4 border-red-500"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Closed Jobs</p>
+                  <p className="text-3xl font-bold text-gray-900">{closedCount}</p>
+                </div>
+                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center shadow-lg">
+                  <Lock className="w-6 h-6 text-white" />
                 </div>
               </div>
             </Card>
@@ -763,6 +815,17 @@ Employment Type: ${formData.employment_type}
               Hidden ({hiddenCount})
             </button>
             <button
+              onClick={() => setStatusFilter('closed')}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
+                statusFilter === 'closed'
+                  ? 'bg-red-500 text-white shadow-md'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:border-red-500 hover:bg-red-50'
+              }`}
+            >
+              <Lock className="w-4 h-4" />
+              Closed ({closedCount})
+            </button>
+            <button
               onClick={() => setStatusFilter('archived')}
               className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
                 statusFilter === 'archived'
@@ -791,12 +854,14 @@ Employment Type: ${formData.employment_type}
                   {statusFilter === 'all' && 'No jobs found'}
                   {statusFilter === 'active' && 'No active jobs'}
                   {statusFilter === 'hidden' && 'No hidden jobs'}
+                  {statusFilter === 'closed' && 'No closed jobs'}
                   {statusFilter === 'archived' && 'No archived jobs'}
                 </h3>
                 <p className="text-gray-600 mb-4">
                   {statusFilter === 'all' && 'Create your first job posting to get started'}
                   {statusFilter === 'active' && 'All your active jobs will appear here'}
                   {statusFilter === 'hidden' && 'Jobs you hide will appear here'}
+                  {statusFilter === 'closed' && 'Jobs you close will appear here'}
                   {statusFilter === 'archived' && 'Deleted jobs will appear here'}
                 </p>
                 {statusFilter === 'all' && (
@@ -1659,6 +1724,116 @@ Employment Type: ${formData.employment_type}
                       disabled={submitting}
                     >
                       {submitting ? 'Restoring...' : 'Restore Job'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Close Confirmation Modal */}
+          {showCloseConfirm && jobToClose && (
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+                {/* Modal Header */}
+                <div className="bg-gradient-to-r from-red-500 to-red-600 p-6 rounded-t-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg p-1.5">
+                        <Image
+                          src="/JS-logo.png"
+                          alt="JobSync"
+                          width={40}
+                          height={40}
+                          className="rounded-lg object-cover"
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-white">Close Job Posting</h3>
+                        <p className="text-sm text-white/90">Mark job as closed</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowCloseConfirm(false);
+                        setJobToClose(null);
+                      }}
+                      className="text-white hover:bg-white/30 hover:text-gray-100 rounded-lg p-2 transition-all duration-200"
+                      disabled={submitting}
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modal Body */}
+                <div className="p-6 space-y-4">
+                  {/* Warning Message */}
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                    <div className="flex items-start gap-3">
+                      <Lock className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-red-800 mb-1">
+                          Close Job Posting
+                        </p>
+                        <p className="text-sm text-red-700">
+                          This will mark the job as closed and prevent new applications.
+                        </p>
+                        <ul className="text-sm text-red-700 list-disc list-inside mt-2 space-y-1">
+                          <li>Job will be marked as closed</li>
+                          <li>No new applications will be accepted</li>
+                          <li>Existing applications will be preserved</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Job Info */}
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-2">Job to be closed:</p>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Briefcase className="w-4 h-4 text-gray-400" />
+                        <span className="font-medium text-gray-900">{jobToClose.position}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-700">{jobToClose.degree}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-gray-400" />
+                        <Badge
+                          variant={jobToClose.status === 'Active' ? 'success' : 'warning'}
+                          className="text-xs"
+                        >
+                          {jobToClose.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setShowCloseConfirm(false);
+                        setJobToClose(null);
+                      }}
+                      className="flex-1"
+                      disabled={submitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="danger"
+                      icon={Lock}
+                      loading={submitting}
+                      onClick={handleClose}
+                      className="flex-1"
+                      disabled={submitting}
+                    >
+                      {submitting ? 'Closing...' : 'Close Job'}
                     </Button>
                   </div>
                 </div>

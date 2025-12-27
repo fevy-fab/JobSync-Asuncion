@@ -24,7 +24,9 @@ export async function createNotification(userId: string, notification: Notificat
   try {
     const supabase = await createClient();
 
-    const { data, error } = await supabase
+    // Note: Removed .select() to avoid RLS errors when creating notifications for other users
+    // The INSERT succeeds, but SELECT would fail due to RLS policies checking user_id = auth.uid()
+    const { error } = await supabase
       .from('notifications')
       .insert({
         user_id: userId,
@@ -35,16 +37,16 @@ export async function createNotification(userId: string, notification: Notificat
         related_entity_id: notification.related_entity_id || null,
         link_url: notification.link_url || null,
         is_read: false,
-      })
-      .select()
-      .single();
+      });
 
     if (error) {
       console.error('Error creating notification:', error);
       return null;
     }
 
-    return data;
+    // Return success indicator instead of the notification data
+    // Callers don't use the returned data, they just check for null/non-null
+    return { success: true };
   } catch (error) {
     console.error('Failed to create notification:', error);
     return null;

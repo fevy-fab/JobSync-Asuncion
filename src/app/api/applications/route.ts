@@ -431,6 +431,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check job status and provide specific error messages
+    if (job.status === 'closed') {
+      return NextResponse.json(
+        { success: false, error: 'This job has been closed as all positions have been filled' },
+        { status: 400 }
+      );
+    }
+
+    if (job.status === 'archived') {
+      return NextResponse.json(
+        { success: false, error: 'This job posting has been archived and is no longer available' },
+        { status: 400 }
+      );
+    }
+
     if (job.status !== 'active') {
       return NextResponse.json(
         { success: false, error: 'This job is no longer accepting applications' },

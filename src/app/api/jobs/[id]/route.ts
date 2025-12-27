@@ -250,9 +250,9 @@ export async function PATCH(
     }
 
     if (body.status !== undefined) {
-      if (!['active', 'hidden', 'archived'].includes(body.status)) {
+      if (!['active', 'hidden', 'archived', 'closed'].includes(body.status)) {
         return NextResponse.json(
-          { success: false, error: 'Invalid status. Must be: active, hidden, or archived' },
+          { success: false, error: 'Invalid status. Must be: active, hidden, archived, or closed' },
           { status: 400 }
         );
       }
