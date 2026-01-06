@@ -68,10 +68,11 @@ export async function generateColorfulAchievementCertificate(
   doc.text('❖', pageWidth - 22, pageHeight - 12);
 
   // ===== LOGOS (Top, Centered) =====
-  let currentY = 22;
+  let currentY = 14;
   const logoSize = 18;
   const logoSpacing = 28;
-  const startX = centerX - (logoSpacing * 0.5);
+  const totalWidth = logoSize * 2 + logoSpacing;
+  const startX = centerX - (totalWidth / 2);
 
   // LGU Seal (Left)
   if (lguSeal) {
@@ -85,14 +86,14 @@ export async function generateColorfulAchievementCertificate(
   // PESO Logo (Right)
   if (pesoLogo) {
     try {
-      doc.addImage(pesoLogo, 'JPEG', startX + logoSpacing, currentY, logoSize, logoSize);
+      doc.addImage(pesoLogo, 'JPEG', startX + logoSize + logoSpacing, currentY, logoSize, logoSize);
     } catch (error) {
       console.error('Error adding PESO logo:', error);
     }
   }
 
   // ===== HEADER =====
-  currentY = 46;
+  currentY = 38;
 
   doc.setFontSize(9);
   doc.setFont('times', 'bold');
@@ -110,7 +111,7 @@ export async function generateColorfulAchievementCertificate(
   doc.text('Public Employment Service Office (P.E.S.O.)', centerX, currentY, { align: 'center' });
 
   // ===== CERTIFICATE TITLE =====
-  currentY += 14;
+  currentY += 10;
   doc.setFontSize(26);
   doc.setFont('times', 'bold');
   doc.setTextColor(139, 58, 98); // Burgundy
@@ -123,7 +124,7 @@ export async function generateColorfulAchievementCertificate(
   doc.line(70, currentY, pageWidth - 70, currentY);
 
   // ===== CERTIFICATE BODY =====
-  currentY += 14;
+  currentY += 9;
   doc.setFontSize(11);
   doc.setFont('times', 'normal');
   doc.setTextColor(50, 50, 50);
@@ -145,14 +146,14 @@ export async function generateColorfulAchievementCertificate(
   doc.line(centerX - nameWidth / 2 - 5, currentY, centerX + nameWidth / 2 + 5, currentY);
 
   // Achievement text
-  currentY += 13;
+  currentY += 11;
   doc.setFontSize(11);
   doc.setFont('times', 'normal');
   doc.setTextColor(50, 50, 50);
   doc.text('for successfully completing the training program', centerX, currentY, { align: 'center' });
 
   // Program Title (Burgundy, serif)
-  currentY += 11;
+  currentY += 12;
   doc.setFontSize(15);
   doc.setFont('times', 'bold');
   doc.setTextColor(139, 58, 98); // Burgundy
@@ -160,10 +161,11 @@ export async function generateColorfulAchievementCertificate(
   doc.text(programTitle, centerX, currentY, { align: 'center' });
 
   // ===== ACHIEVEMENT DETAILS BOX =====
-  currentY += 14;
-  const boxHeight = 30;
+  currentY += 13;
+  const boxHeight = 36;
   const boxWidth = pageWidth - 120;
   const boxX = centerX - boxWidth / 2;
+  const boxStartY = currentY;
 
   // Warm background with elegant border
   doc.setFillColor(255, 251, 235); // #FFFBEB Very light warm
@@ -172,7 +174,7 @@ export async function generateColorfulAchievementCertificate(
   doc.roundedRect(boxX, currentY, boxWidth, boxHeight, 2, 2, 'FD');
 
   // Box content
-  let boxY = currentY + 8;
+  let boxY = currentY + 10;
   doc.setFontSize(9);
   doc.setFont('times', 'normal');
   doc.setTextColor(60, 60, 60);
@@ -218,22 +220,13 @@ export async function generateColorfulAchievementCertificate(
   }
 
   // ===== FOOTER SECTION =====
-  currentY = pageHeight - 36;
-
-  // Certificate ID & Date
-  doc.setFontSize(7);
-  doc.setFont('times', 'italic');
-  doc.setTextColor(120, 120, 120);
-  const certId = data.certification.certificate_id || generateCertificateId();
-  const issueDate = formatDate(data.certification.issued_at);
-  doc.text(`Certificate ID: ${certId} • Issued: ${issueDate}`, centerX, currentY, { align: 'center' });
+  currentY = boxStartY + boxHeight + 8;
 
   // Signature section
-  currentY += 8;
   const signatureWidth = 40;
   const signatureHeight = 14;
   const signatureX = centerX - (signatureWidth / 2);
-  const signatureLineY = currentY + 12;
+  const signatureLineY = currentY + 14;
 
   // Add signature image
   if (signatureBase64) {
@@ -260,6 +253,15 @@ export async function generateColorfulAchievementCertificate(
   doc.setFont('times', 'normal');
   doc.setTextColor(100, 100, 100);
   doc.text(data.certification.issued_by.title, centerX, signatureLineY + 9, { align: 'center' });
+
+  // Certificate ID & Date (positioned after signature section)
+  const certIdY = signatureLineY + 15;
+  doc.setFontSize(8);
+  doc.setFont('times', 'italic');
+  doc.setTextColor(120, 120, 120);
+  const certId = data.certification.certificate_id || generateCertificateId();
+  const issueDate = formatDate(data.certification.issued_at);
+  doc.text(`Certificate ID: ${certId} • Issued: ${issueDate}`, centerX, certIdY, { align: 'center' });
 
   // Return PDF as Uint8Array
   return new Uint8Array(doc.output('arraybuffer'));
