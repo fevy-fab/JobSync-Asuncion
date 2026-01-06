@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Parse request body
     const body: GenerateCertificateRequest = await request.json();
-    const { application_id, notes, include_qr_code, include_signature } = body;
+    const { application_id, notes, include_qr_code, include_signature, template, layoutParams } = body;
 
     if (!application_id) {
       return NextResponse.json(
@@ -96,7 +96,9 @@ export async function POST(request: NextRequest) {
           start_date,
           end_date,
           skills_covered,
-          location
+          location,
+          speaker_name,
+          certificate_template
         )
       `)
       .eq('id', application_id)
@@ -167,6 +169,7 @@ export async function POST(request: NextRequest) {
         end_date: program.end_date,
         skills_covered: program.skills_covered,
         location: program.location,
+        speaker_name: program.speaker_name || null,
       },
       completion: {
         completed_at: application.training_completed_at,
@@ -185,10 +188,13 @@ export async function POST(request: NextRequest) {
       notes: notes || undefined,
     };
 
-    // 9. Generate PDF
+    // 9. Generate PDF with template selection
+    // Use program's template if specified, fallback to request template or default 'classic'
+    const selectedTemplate = program.certificate_template || template || 'classic';
+
     let pdfBytes: Uint8Array;
     try {
-      pdfBytes = await generateCertificatePDF(certificateData);
+      pdfBytes = await generateCertificatePDF(certificateData, selectedTemplate, layoutParams);
     } catch (pdfError: any) {
       console.error('Error generating PDF:', pdfError);
       return NextResponse.json(

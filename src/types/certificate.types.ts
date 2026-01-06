@@ -4,6 +4,16 @@
  * TypeScript interfaces for training certificate generation and management
  */
 
+/**
+ * Certificate template variants
+ */
+export type CertificateTemplate =
+  | 'classic'        // Traditional certificate with ornamental borders
+  | 'modern'         // Clean, contemporary design with gradient
+  | 'government'     // Formal government document style
+  | 'colorful'       // Vibrant, celebratory design
+  | 'professional';  // Corporate minimal style
+
 export interface CertificateTraineeData {
   full_name: string;
   email: string;
@@ -82,6 +92,8 @@ export interface GenerateCertificateRequest {
   include_qr_code?: boolean;
   include_signature?: boolean;
   layoutParams?: CertificateLayoutParams;
+  template?: CertificateTemplate;      // Certificate template variant
+  customColor?: string;                // Optional custom color in hex format (#RRGGBB)
 }
 
 /**

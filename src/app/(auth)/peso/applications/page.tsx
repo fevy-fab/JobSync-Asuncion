@@ -8,11 +8,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { StatusTimeline } from '@/components/peso/StatusTimeline';
 import { getStatusConfig } from '@/lib/config/statusConfig';
 import { generateCertificatePreview, generateCertificateId } from '@/lib/certificates/certificateGenerator';
-import type { CertificateData, CertificateLayoutParams } from '@/types/certificate.types';
+import type { CertificateData, CertificateLayoutParams, CertificateTemplate } from '@/types/certificate.types';
 import { MarkAttendanceModal } from '@/components/peso/MarkAttendanceModal';
 import { AwardCompletionModal } from '@/components/peso/AwardCompletionModal';
 import BulkCertificateModal from '@/components/peso/BulkCertificateModal';
 import CertificatePreview from '@/components/peso/CertificatePreview';
+import CertificateTemplateModal from '@/components/peso/CertificateTemplateModal';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 // import { useTableRealtime } from '@/hooks/useTableRealtime'; // REMOVED: Realtime disabled
 import { Eye, CheckCircle, XCircle, User, Mail, Phone, MapPin, GraduationCap, Briefcase, Clock, Download, Image as ImageIcon, Filter, Loader2, History, UserCheck, Play, Award, CheckCircle2, AlertCircle, FileText, Users, ExternalLink, CheckSquare, Square, FileCheck } from 'lucide-react';
@@ -72,10 +73,12 @@ export default function PESOApplicationsPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [nextSteps, setNextSteps] = useState('');
   const [denialReason, setDenialReason] = useState('');
-  const [includeSignature, setIncludeSignature] = useState(false);
+  const [includeSignature, setIncludeSignature] = useState(true);
   const [hasSignature, setHasSignature] = useState<boolean>(false);
   const [signatureLoading, setSignatureLoading] = useState<boolean>(false);
   const [generateLoading, setGenerateLoading] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<CertificateTemplate>('classic');
 
   // Bulk operations state
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
@@ -329,6 +332,7 @@ export default function PESOApplicationsPage() {
         body: JSON.stringify({
           application_id: selectedApplication.id,
           include_signature: includeSignature,
+          template: selectedTemplate,
         }),
       });
 
@@ -341,9 +345,10 @@ export default function PESOApplicationsPage() {
       showToast(result.message || 'Certificate generated and issued successfully!', 'success');
       setCertifyModalOpen(false);
       setSelectedApplication(null);
-      setIncludeSignature(false);
+      setIncludeSignature(true);
       setHasSignature(false);
       setSignatureLoading(false);
+      setSelectedTemplate('classic');
       fetchApplications();
     } catch (error: any) {
       console.error('Error generating certificate:', error);
@@ -365,6 +370,7 @@ export default function PESOApplicationsPage() {
         body: JSON.stringify({
           application_id: selectedApplication.id,
           include_signature: includeSignature,
+          template: selectedTemplate,
         }),
       });
 
@@ -1959,7 +1965,7 @@ export default function PESOApplicationsPage() {
             onClose={() => {
               setCertifyModalOpen(false);
               setSelectedApplication(null);
-              setIncludeSignature(false);
+              setIncludeSignature(true);
             }}
             title="Generate Training Certificate"
             subtitle="Preview and customize before issuing"
@@ -1991,6 +1997,27 @@ export default function PESOApplicationsPage() {
                     <span className="font-semibold text-gray-900">{selectedApplication.training_programs?.duration}</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Template Selection */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-900">Certificate Template</span>
+                  <span className="text-xs text-purple-700 font-medium uppercase tracking-wide">
+                    {selectedTemplate}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 mb-3">
+                  Choose from 5 professional templates to customize the look of your certificate
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowTemplateModal(true)}
+                  className="w-full"
+                >
+                  Browse Templates
+                </Button>
               </div>
 
               {/* Signature Option */}
@@ -2055,7 +2082,7 @@ export default function PESOApplicationsPage() {
                   onClick={() => {
                     setCertifyModalOpen(false);
                     setSelectedApplication(null);
-                    setIncludeSignature(false);
+                    setIncludeSignature(true);
                   }}
                   disabled={generateLoading}
                   className="w-full"
@@ -2423,6 +2450,14 @@ export default function PESOApplicationsPage() {
         imageUrl={previewImageUrl}
         imageName={`${previewUserName}'s Profile Picture`}
         userName={previewUserName}
+      />
+
+      {/* Certificate Template Selection Modal */}
+      <CertificateTemplateModal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        selectedTemplate={selectedTemplate}
+        onTemplateChange={setSelectedTemplate}
       />
     </AdminLayout>
   );

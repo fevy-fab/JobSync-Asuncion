@@ -54,16 +54,17 @@ export async function POST(request: NextRequest) {
     }
 
     // 3. Parse request body
-    const { application_id, notes, include_signature } = await request.json();
+    const { application_id, notes, include_signature, template, layoutParams, certificateData } = await request.json();
 
-    if (!application_id) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required field: application_id' },
-        { status: 400 }
-      );
-    }
+    // Support both modes: application_id or direct certificateData
+    let finalCertificateData: CertificateData;
 
-    // 4. Fetch training application with program data
+    if (certificateData) {
+      // Direct certificate data provided (for template preview modal)
+      finalCertificateData = certificateData;
+    } else if (application_id) {
+      // Fetch from application_id (legacy mode)
+      // 4. Fetch training application with program data
     const { data: application, error: fetchError } = await supabase
       .from('training_applications')
       .select(`
@@ -82,74 +83,85 @@ export async function POST(request: NextRequest) {
           start_date,
           end_date,
           skills_covered,
-          location
+          location,
+          speaker_name,
+          certificate_template
         )
       `)
       .eq('id', application_id)
       .single();
 
-    if (fetchError) {
-      if (fetchError.code === 'PGRST116') {
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
+          return NextResponse.json(
+            { success: false, error: 'Training application not found' },
+            { status: 404 }
+          );
+        }
         return NextResponse.json(
-          { success: false, error: 'Training application not found' },
-          { status: 404 }
+          { success: false, error: fetchError.message },
+          { status: 500 }
         );
       }
-      return NextResponse.json(
-        { success: false, error: fetchError.message },
-        { status: 500 }
-      );
-    }
 
-    // 5. Prepare certificate data
-    const program = application.training_programs as any;
+      // 5. Prepare certificate data
+      const program = application.training_programs as any;
 
-    if (!program) {
-      return NextResponse.json(
-        { success: false, error: 'Training program data not found' },
-        { status: 500 }
-      );
-    }
+      if (!program) {
+        return NextResponse.json(
+          { success: false, error: 'Training program data not found' },
+          { status: 500 }
+        );
+      }
 
-    const certificateData: CertificateData = {
-      trainee: {
-        full_name: application.full_name,
-        email: application.email,
-        phone: application.phone,
-        address: application.address,
-        highest_education: application.highest_education,
-      },
-      program: {
-        title: program.title,
-        description: program.description || '',
-        duration: program.duration,
-        start_date: program.start_date,
-        end_date: program.end_date,
-        skills_covered: program.skills_covered,
-        location: program.location,
-      },
-      completion: {
-        completed_at: new Date().toISOString(), // Use current date for preview
-        assessment_score: null,
-        attendance_percentage: null,
-      },
-      certification: {
-        certificate_id: 'PREVIEW-' + generateCertificateId().split('-').pop(),
-        issued_at: new Date().toISOString(),
-        issued_by: {
-          name: profile.full_name,
-          title: 'PESO Officer',
-          // Include signature if requested and available
-          ...(include_signature && profile.signature_url ? { signature_url: profile.signature_url } : {}),
+      finalCertificateData = {
+        trainee: {
+          full_name: application.full_name,
+          email: application.email,
+          phone: application.phone,
+          address: application.address,
+          highest_education: application.highest_education,
         },
-      },
-      notes: notes || undefined,
-    };
+        program: {
+          title: program.title,
+          description: program.description || '',
+          duration: program.duration,
+          start_date: program.start_date,
+          end_date: program.end_date,
+          skills_covered: program.skills_covered,
+          location: program.location,
+          speaker_name: program.speaker_name || null,
+        },
+        completion: {
+          completed_at: new Date().toISOString(), // Use current date for preview
+          assessment_score: null,
+          attendance_percentage: null,
+        },
+        certification: {
+          certificate_id: 'PREVIEW-' + generateCertificateId().split('-').pop(),
+          issued_at: new Date().toISOString(),
+          issued_by: {
+            name: profile.full_name,
+            title: 'PESO Officer',
+            // Include signature if requested and available
+            ...(include_signature && profile.signature_url ? { signature_url: profile.signature_url } : {}),
+          },
+        },
+        notes: notes || undefined,
+      };
+    } else {
+      return NextResponse.json(
+        { success: false, error: 'Either application_id or certificateData must be provided' },
+        { status: 400 }
+      );
+    }
 
-    // 6. Generate PDF (server-side with signature support)
+    // 6. Generate PDF with template selection (server-side with signature support)
+    const selectedTemplate = template || 'classic';
+
     let pdfBytes: Uint8Array;
     try {
-      pdfBytes = await generateCertificatePDF(certificateData);
+      pdfBytes = await generateCertificatePDF(finalCertificateData, selectedTemplate, layoutParams);
     } catch (pdfError: any) {
       console.error('Error generating preview PDF:', pdfError);
       return NextResponse.json(
@@ -162,7 +174,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="certificate-preview-${application.full_name.replace(/\s+/g, '-')}.pdf"`,
+        'Content-Disposition': `inline; filename="certificate-preview-${finalCertificateData.trainee.full_name.replace(/\s+/g, '-')}.pdf"`,
         'Cache-Control': 'no-store',
       },
     });
