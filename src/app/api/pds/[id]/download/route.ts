@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { generatePDSPDF } from '@/lib/pds/pdfGenerator';
 import { generateCSCFormatPDF } from '@/lib/pds/pdfGeneratorCSC';
+import { generateRealTemplatePDS } from '@/lib/pds/pdfRealTemplateGenerator';
 import { generatePDSExcel, generatePDSFilename } from '@/lib/pds/pdsExcelGenerator';
 import { transformPDSFromDatabase } from '@/lib/utils/dataTransformers';
 import fs from 'fs';
@@ -70,7 +71,7 @@ export async function GET(
     const applicantName = applicantProfile?.full_name || 'Unknown Applicant';
 
     // Read format, includeSignature and useCurrentDate from query parameters
-    const format = request.nextUrl.searchParams.get('format') || 'modern'; // 'csc' | 'modern' | 'excel'
+    const format = request.nextUrl.searchParams.get('format') || 'modern'; // 'template' | 'official' | 'csc' | 'modern' | 'excel'
     const includeSignature = request.nextUrl.searchParams.get('includeSignature') === 'true';
     const useCurrentDate = request.nextUrl.searchParams.get('useCurrentDate') === 'true';
 
@@ -170,29 +171,54 @@ export async function GET(
     }
 
     // Generate PDF using appropriate generator based on format
-    const doc =
-      format === 'csc'
-        ? await generateCSCFormatPDF(
-            transformedPDSData,
-            includeSignature,
-            true,
-            useCurrentDate
-          )
-        : await generatePDSPDF(
-            transformedPDSData,
-            includeSignature,
-            true,
-            useCurrentDate
-          );
+    let pdfBuffer: ArrayBuffer;
+    let formatLabel: string;
 
-    if (!doc) {
-      return NextResponse.json(
-        { success: false, error: 'Failed to generate PDF document' },
-        { status: 500 }
-      );
+    if (format === 'template') {
+      // 'template' format uses the REAL PDF template with text overlay (pdf-lib)
+      const pdfBufferNode = await generateRealTemplatePDS(transformedPDSData, {
+        includeSignature,
+        useCurrentDate,
+        addWatermark: true
+      });
+      pdfBuffer = pdfBufferNode.buffer.slice(
+        pdfBufferNode.byteOffset,
+        pdfBufferNode.byteOffset + pdfBufferNode.byteLength
+      ) as ArrayBuffer;
+      formatLabel = 'Official_Template';
+    } else {
+      // Other formats use jsPDF generators
+      let doc;
+
+      if (format === 'official' || format === 'csc') {
+        // Both 'official' and 'csc' use the CSC format generator (compliant with CS Form 212)
+        doc = await generateCSCFormatPDF(
+          transformedPDSData,
+          includeSignature,
+          true,
+          useCurrentDate
+        );
+        formatLabel = format === 'official' ? 'Official_CSC' : 'CSC';
+      } else {
+        // 'modern' format uses the modern table-based generator
+        doc = await generatePDSPDF(
+          transformedPDSData,
+          includeSignature,
+          true,
+          useCurrentDate
+        );
+        formatLabel = 'Modern';
+      }
+
+      if (!doc) {
+        return NextResponse.json(
+          { success: false, error: 'Failed to generate PDF document' },
+          { status: 500 }
+        );
+      }
+
+      pdfBuffer = doc.output('arraybuffer');
     }
-
-    const pdfBuffer = doc.output('arraybuffer');
 
     // Create filename with format indicator
     const surname =
@@ -201,7 +227,6 @@ export async function GET(
       pdsData.personal_info?.firstName ||
       applicantName.split(' ').slice(1).join('_') ||
       'User';
-    const formatLabel = format === 'csc' ? 'CSC' : 'Modern';
     const fileName = `PDS_${formatLabel}_${surname}_${firstName}_${new Date().getTime()}.pdf`;
 
     // Return PDF as downloadable file

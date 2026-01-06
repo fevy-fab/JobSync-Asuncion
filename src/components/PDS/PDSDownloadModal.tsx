@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Modal } from '@/components/ui';
-import { FileText, Download, CheckCircle2, FileSpreadsheet } from 'lucide-react';
+import { FileText, Download, CheckCircle2, FileSpreadsheet, FileCheck } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 
 interface PDSDownloadModalProps {
@@ -13,7 +13,7 @@ interface PDSDownloadModalProps {
 
 export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalProps) {
   const { showToast } = useToast();
-  const [selectedFormat, setSelectedFormat] = useState<'csc' | 'modern' | 'excel'>('csc');
+  const [selectedFormat, setSelectedFormat] = useState<'template' | 'official' | 'csc' | 'modern' | 'excel'>('template');
   const [includeSignature, setIncludeSignature] = useState(true);
   const [useCurrentDate, setUseCurrentDate] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -61,7 +61,8 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
         }
         link.download = filename;
       } else {
-        link.download = `PDS_${selectedFormat === 'csc' ? 'CSC' : 'Modern'}_${new Date().toISOString().split('T')[0]}.pdf`;
+        const formatLabel = selectedFormat === 'template' ? 'Official_Template' : selectedFormat === 'official' ? 'Official_CSC' : selectedFormat === 'csc' ? 'CSC' : 'Modern';
+        link.download = `PDS_${formatLabel}_${new Date().toISOString().split('T')[0]}.pdf`;
       }
 
       document.body.appendChild(link);
@@ -93,35 +94,94 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
         <div>
           <h3 className="text-sm font-semibold text-gray-700 mb-3">Select Format:</h3>
           <div className="grid grid-cols-3 gap-3">
+            {/* NEW: Official Template (Real PDF) Option */}
+            <button
+              onClick={() => setSelectedFormat('template')}
+              className={`relative p-3 rounded-lg border-2 transition-all ${
+                selectedFormat === 'template'
+                  ? 'border-purple-500 bg-purple-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              }`}
+            >
+              <div className="flex flex-col items-center text-center space-y-2">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  selectedFormat === 'template' ? 'bg-purple-500' : 'bg-gray-200'
+                }`}>
+                  <FileCheck className={`w-5 h-5 ${
+                    selectedFormat === 'template' ? 'text-white' : 'text-gray-600'
+                  }`} />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 text-sm">Real Template PDF</h4>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Uses Actual PDF Form
+                  </p>
+                </div>
+                {selectedFormat === 'template' && (
+                  <div className="absolute top-2 right-2">
+                    <CheckCircle2 className="w-4 h-4 text-purple-500" />
+                  </div>
+                )}
+              </div>
+            </button>
+
+            {/* Official CSC (Programmatic) Option */}
+            <button
+              onClick={() => setSelectedFormat('official')}
+              className={`relative p-3 rounded-lg border-2 transition-all ${
+                selectedFormat === 'official'
+                  ? 'border-emerald-500 bg-emerald-50'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              }`}
+            >
+              <div className="flex flex-col items-center text-center space-y-2">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                  selectedFormat === 'official' ? 'bg-emerald-500' : 'bg-gray-200'
+                }`}>
+                  <FileText className={`w-5 h-5 ${
+                    selectedFormat === 'official' ? 'text-white' : 'text-gray-600'
+                  }`} />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 text-sm">Official CSC PDF</h4>
+                  <p className="text-xs text-gray-600 mt-1">
+                    CSC-Compliant Layout
+                  </p>
+                </div>
+                {selectedFormat === 'official' && (
+                  <div className="absolute top-2 right-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                  </div>
+                )}
+              </div>
+            </button>
+
             {/* CSC Format Option */}
             <button
               onClick={() => setSelectedFormat('csc')}
-              className={`relative p-4 rounded-lg border-2 transition-all ${
+              className={`relative p-3 rounded-lg border-2 transition-all ${
                 selectedFormat === 'csc'
                   ? 'border-green-500 bg-green-50'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
               }`}
             >
               <div className="flex flex-col items-center text-center space-y-2">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                   selectedFormat === 'csc' ? 'bg-green-500' : 'bg-gray-200'
                 }`}>
-                  <FileText className={`w-6 h-6 ${
+                  <FileText className={`w-5 h-5 ${
                     selectedFormat === 'csc' ? 'text-white' : 'text-gray-600'
                   }`} />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">Boxed-based PDS Form (PDF)</h4>
+                  <h4 className="font-semibold text-gray-900 text-sm">Box-based PDS Form (PDF)</h4>
                   <p className="text-xs text-gray-600 mt-1">
                     JobSync Layout
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Structured box-based design
                   </p>
                 </div>
                 {selectedFormat === 'csc' && (
                   <div className="absolute top-2 right-2">
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
                   </div>
                 )}
               </div>
@@ -130,32 +190,29 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
             {/* Modern Format Option */}
             <button
               onClick={() => setSelectedFormat('modern')}
-              className={`relative p-4 rounded-lg border-2 transition-all ${
+              className={`relative p-3 rounded-lg border-2 transition-all ${
                 selectedFormat === 'modern'
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
               }`}
             >
               <div className="flex flex-col items-center text-center space-y-2">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                   selectedFormat === 'modern' ? 'bg-blue-500' : 'bg-gray-200'
                 }`}>
-                  <FileText className={`w-6 h-6 ${
+                  <FileText className={`w-5 h-5 ${
                     selectedFormat === 'modern' ? 'text-white' : 'text-gray-600'
                   }`} />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">Modern PDS Form (PDF)</h4>
+                  <h4 className="font-semibold text-gray-900 text-sm">Modern PDS Form (PDF)</h4>
                   <p className="text-xs text-gray-600 mt-1">
-                    JobSync Layout
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Simple and clean table design
+                    Clean Table Design
                   </p>
                 </div>
                 {selectedFormat === 'modern' && (
                   <div className="absolute top-2 right-2">
-                    <CheckCircle2 className="w-5 h-5 text-blue-500" />
+                    <CheckCircle2 className="w-4 h-4 text-blue-500" />
                   </div>
                 )}
               </div>
@@ -164,32 +221,29 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
             {/* Excel Format Option */}
             <button
               onClick={() => setSelectedFormat('excel')}
-              className={`relative p-4 rounded-lg border-2 transition-all ${
+              className={`relative p-3 rounded-lg border-2 transition-all ${
                 selectedFormat === 'excel'
                   ? 'border-teal-500 bg-teal-50'
                   : 'border-gray-200 hover:border-gray-300 bg-white'
               }`}
             >
               <div className="flex flex-col items-center text-center space-y-2">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                   selectedFormat === 'excel' ? 'bg-teal-500' : 'bg-gray-200'
                 }`}>
-                  <FileSpreadsheet className={`w-6 h-6 ${
+                  <FileSpreadsheet className={`w-5 h-5 ${
                     selectedFormat === 'excel' ? 'text-white' : 'text-gray-600'
                   }`} />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">Official CS PDS Form (Excel)</h4>
+                  <h4 className="font-semibold text-gray-900 text-sm">Official CS PDS Form (Excel)</h4>
                   <p className="text-xs text-gray-600 mt-1">
-                    Official Government Format
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    CSC Form No. 212, Revised 2025
+                    CSC Form No. 212, 2025
                   </p>
                 </div>
                 {selectedFormat === 'excel' && (
                   <div className="absolute top-2 right-2">
-                    <CheckCircle2 className="w-5 h-5 text-teal-500" />
+                    <CheckCircle2 className="w-4 h-4 text-teal-500" />
                   </div>
                 )}
               </div>
@@ -232,13 +286,25 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
         {/* Format Description */}
         <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
           <h4 className="text-sm font-semibold text-gray-900 mb-2">
-            {selectedFormat === 'csc' ? 'Boxed-based PDS Form' : selectedFormat === 'excel' ? 'Official Excel 2025 Format' : 'Modern PDS Format'}
+            {selectedFormat === 'template'
+              ? 'Real Template PDF (NEW!)'
+              : selectedFormat === 'official'
+              ? 'Official CSC PDF'
+              : selectedFormat === 'csc'
+              ? 'Box-based PDS Form'
+              : selectedFormat === 'excel'
+              ? 'Official Excel 2025 Format'
+              : 'Modern PDS Format'}
           </h4>
           <p className="text-xs text-gray-600">
-            {selectedFormat === 'csc'
+            {selectedFormat === 'template'
+              ? '🆕 Uses the ACTUAL CS Form 212 PDF template file with data overlaid at precise coordinates. This is the real government PDF form with your information filled in programmatically. Most authentic format available!'
+              : selectedFormat === 'official'
+              ? 'Programmatically generated CSC-compliant PDF matching official CS Form No. 212, Revised 2025 layout. Fast generation with perfect formatting.'
+              : selectedFormat === 'csc'
               ? 'Box-based layout format with structured sections. Provides a traditional form-style presentation with clearly defined boxes and fields. Ideal for formal submissions and traditional document formats.'
               : selectedFormat === 'excel'
-              ? 'Official government format (CS Form No. 212, Revised 2025). Recommended for submission to government panels and HR offices requiring CSC compliance.'
+              ? 'Official government format (CS Form No. 212, Revised 2025). Recommended for submission to government panels and HR offices requiring CSC compliance. Editable spreadsheet format.'
               : 'Streamlined table-based design optimized for readability. Clean layout ideal for internal reviews, portfolio purposes, and digital archiving.'}
           </p>
         </div>

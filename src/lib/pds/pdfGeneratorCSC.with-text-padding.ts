@@ -25,26 +25,6 @@ export async function generateCSCFormatPDF(
   const margin = 10;
   const contentWidth = pageWidth - 2 * margin;
 
-  // ============================================================================
-  // CONFIGURATION CONSTANTS - To match official CS Form No. 212, Revised 2025
-  // ============================================================================
-
-  // Padding configuration (in mm) - ensures text stays inside borders
-  const TEXT_PADDING = 2;           // 2mm from left/right edges of boxes
-  const VERTICAL_PADDING = 1.5;     // 1.5mm from top/bottom edges
-
-  // Font size hierarchy (in points)
-  const FONT_SIZES = {
-    sectionHeader: 9,      // Section titles (I. PERSONAL INFORMATION)
-    fieldLabel: 7,         // Label text in boxes (gray backgrounds)
-    fieldValue: 8,         // Normal value text
-    tableHeader: 6,        // Table column headers
-    tableContent: 7,       // Table cell content
-  };
-
-  // Line height multiplier for proper text spacing
-  const LINE_HEIGHT_MULTIPLIER = 0.4;  // 40% of font size in mm (Helvetica)
-
   let yPosition = margin;
   let pageNumber = 1;
 
@@ -77,7 +57,10 @@ export async function generateCSCFormatPDF(
     doc.rect(x, y, width, height);
   };
 
-  // Helper: Draw text in box with proper padding (text stays inside borders)
+  // Text padding constant - ensures text stays within box borders
+  const TEXT_PADDING = 2; // mm from left/right edges
+
+  // Helper: Draw text in box
   const drawTextInBox = (
     text: string,
     x: number,
@@ -93,22 +76,18 @@ export async function generateCSCFormatPDF(
     // Calculate available width for text (subtract padding from both sides)
     const availableWidth = width - (2 * TEXT_PADDING);
 
-    // Word wrap text to fit within available width
+    // Word wrap if text is too long - use available width
     const lines = doc.splitTextToSize(text, availableWidth);
-
-    // Calculate line height using multiplier (more accurate than fixed 0.35)
-    const lineHeight = fontSize * LINE_HEIGHT_MULTIPLIER;
-
-    // Calculate starting Y position with proper vertical padding
-    const textY = y + VERTICAL_PADDING + (fontSize * 0.35); // 0.35 = baseline offset
+    const lineHeight = fontSize * 0.35;
+    const textY = y + height / 2 + (lines.length * lineHeight) / 4;
 
     lines.forEach((line: string, index: number) => {
-      // Render text with left padding to stay inside border
-      doc.text(line, x + TEXT_PADDING, textY + (index * lineHeight));
+      // Add left padding to ensure text starts inside border
+      doc.text(line, x + TEXT_PADDING, textY + index * lineHeight);
     });
   };
 
-  // Helper: Draw label + value box (with proper padding)
+  // Helper: Draw label + value box
   const drawLabelValueBox = (
     label: string,
     value: string,
@@ -118,25 +97,62 @@ export async function generateCSCFormatPDF(
     valueWidth: number,
     height: number = 7
   ) => {
-    // Label box with gray background
+    // Label box
     drawBox(x, y, labelWidth, height);
     doc.setFillColor(240, 240, 240);
     doc.rect(x, y, labelWidth, height, 'F');
-    drawTextInBox(label, x, y, labelWidth, height, FONT_SIZES.fieldLabel, true);
+    drawTextInBox(label, x, y, labelWidth, height, 7, true);
 
     // Value box
     drawBox(x + labelWidth, y, valueWidth, height);
-    drawTextInBox(value, x + labelWidth, y, valueWidth, height, FONT_SIZES.fieldValue);
+    drawTextInBox(value, x + labelWidth, y, valueWidth, height, 8);
 
     return y + height;
+  };
+
+  // Helper: Draw checkbox with label
+  const drawCheckbox = (
+    x: number,
+    y: number,
+    isChecked: boolean,
+    size: number = 3
+  ) => {
+    // Draw checkbox square
+    drawBox(x, y, size, size);
+
+    // Draw checkmark if checked
+    if (isChecked) {
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('✓', x + 0.5, y + 2.5);
+    }
   };
 
   // ============================================================================
   // HEADER
   // ============================================================================
+  // Top-left: CS Form Number and Revision
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'italic');
+  doc.text('CS Form No. 212', margin, yPosition + 3);
+  doc.text('Revised 2025', margin, yPosition + 6);
+
+  // Photo Box - Top Right Corner (4x5 cm)
+  const photoBoxWidth = 35;
+  const photoBoxHeight = 45;
+  const photoBoxX = pageWidth - margin - photoBoxWidth;
+  const photoBoxY = yPosition;
+
+  drawBox(photoBoxX, photoBoxY, photoBoxWidth, photoBoxHeight);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'italic');
+  doc.text('PHOTO', photoBoxX + photoBoxWidth / 2, photoBoxY + photoBoxHeight + 3, { align: 'center' });
+  doc.text('(4.5cm x 3.5cm)', photoBoxX + photoBoxWidth / 2, photoBoxY + photoBoxHeight + 6, { align: 'center' });
+
+  // Title (centered)
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text('PERSONAL DATA SHEET', pageWidth / 2, yPosition, { align: 'center' });
+  doc.text('PERSONAL DATA SHEET', pageWidth / 2, yPosition + 3, { align: 'center' });
   yPosition += 5;
 
   doc.setFontSize(9);
@@ -162,6 +178,11 @@ export async function generateCSCFormatPDF(
   doc.text(instructionText, pageWidth / 2, yPosition, { align: 'center' });
   yPosition += 8;
 
+  // Ensure yPosition clears the photo box
+  if (yPosition < photoBoxY + photoBoxHeight + 8) {
+    yPosition = photoBoxY + photoBoxHeight + 8;
+  }
+
   // ============================================================================
   // I. PERSONAL INFORMATION
   // ============================================================================
@@ -178,6 +199,9 @@ export async function generateCSCFormatPDF(
 
   if (pdsData.personalInfo) {
     const pi = pdsData.personalInfo;
+
+    // CS ID Number (Field #1) - For CSC use only
+    yPosition = drawLabelValueBox('1. CS ID NO. (Do not fill up. For CSC use only)', '', margin, yPosition, 70, contentWidth - 70);
 
     // Name fields (row 1)
     drawBox(margin, yPosition, contentWidth, 7);
@@ -215,29 +239,121 @@ export async function generateCSCFormatPDF(
     // Place of birth row
     yPosition = drawLabelValueBox('4. PLACE OF BIRTH', pi.placeOfBirth || 'N/A', margin, yPosition, 40, contentWidth - 40);
 
-    // Sex, Civil Status, Height, Weight, Blood Type (row)
+    // Sex with checkboxes (row)
     const infoBoxWidth = contentWidth / 5;
-    yPosition = drawLabelValueBox('5. SEX', pi.sexAtBirth || 'N/A', margin, yPosition, 20, infoBoxWidth - 20, 7);
-    yPosition -= 7;
-    yPosition = drawLabelValueBox('6. CIVIL STATUS', pi.civilStatus || 'N/A', margin + infoBoxWidth, yPosition, 22, infoBoxWidth - 22, 7);
-    yPosition -= 7;
-    yPosition = drawLabelValueBox('7. HEIGHT (m)', pi.height?.toString() || 'N/A', margin + 2 * infoBoxWidth, yPosition, 25, infoBoxWidth - 25, 7);
-    yPosition -= 7;
-    yPosition = drawLabelValueBox('8. WEIGHT (kg)', pi.weight?.toString() || 'N/A', margin + 3 * infoBoxWidth, yPosition, 25, infoBoxWidth - 25, 7);
-    yPosition -= 7;
-    yPosition = drawLabelValueBox('9. BLOOD TYPE', pi.bloodType || 'N/A', margin + 4 * infoBoxWidth, yPosition, 25, infoBoxWidth - 25, 7);
+    drawBox(margin, yPosition, infoBoxWidth, 7);
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPosition, 20, 7, 'F');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text('5. SEX', margin + TEXT_PADDING, yPosition + 5);
 
-    // Citizenship
-    yPosition = drawLabelValueBox('10. CITIZENSHIP', pi.citizenship || 'Filipino', margin, yPosition, 40, contentWidth - 40);
+    // Sex checkboxes: Male/Female
+    const sexBoxX = margin + 20 + 2;
+    const sexBoxY = yPosition + 2;
+    drawCheckbox(sexBoxX, sexBoxY, pi.sexAtBirth?.toLowerCase() === 'male');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Male', sexBoxX + 4, sexBoxY + 2.5);
+    drawCheckbox(sexBoxX + 15, sexBoxY, pi.sexAtBirth?.toLowerCase() === 'female');
+    doc.text('Female', sexBoxX + 19, sexBoxY + 2.5);
 
+    // Civil Status with checkboxes
+    drawBox(margin + infoBoxWidth, yPosition, infoBoxWidth * 2, 7);
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin + infoBoxWidth, yPosition, 30, 7, 'F');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text('6. CIVIL STATUS', margin + infoBoxWidth + TEXT_PADDING, yPosition + 5);
+
+    // Civil Status checkboxes
+    const csBoxX = margin + infoBoxWidth + 30 + 2;
+    const csBoxY = yPosition + 2;
+    const civilStatus = pi.civilStatus?.toLowerCase() || '';
+    drawCheckbox(csBoxX, csBoxY, civilStatus === 'single');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Single', csBoxX + 4, csBoxY + 2.5);
+    drawCheckbox(csBoxX + 13, csBoxY, civilStatus === 'married');
+    doc.text('Married', csBoxX + 17, csBoxY + 2.5);
+    drawCheckbox(csBoxX + 30, csBoxY, civilStatus === 'widowed');
+    doc.text('Widowed', csBoxX + 34, csBoxY + 2.5);
+    drawCheckbox(csBoxX + 48, csBoxY, civilStatus === 'separated');
+    doc.text('Separated', csBoxX + 52, csBoxY + 2.5);
+
+    // Height, Weight, Blood Type (same row)
+    yPosition = drawLabelValueBox('7. HEIGHT (m)', pi.height?.toString() || 'N/A', margin + 3 * infoBoxWidth, yPosition, 20, infoBoxWidth - 20, 7);
+    yPosition -= 7;
+    yPosition = drawLabelValueBox('8. WEIGHT (kg)', pi.weight?.toString() || 'N/A', margin + 4 * infoBoxWidth, yPosition, 20, infoBoxWidth - 20, 7);
+    yPosition -= 7;
+
+    // Blood Type on next row
+    drawBox(margin, yPosition, infoBoxWidth, 7);
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, yPosition, 25, 7, 'F');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'bold');
+    doc.text('9. BLOOD TYPE', margin + TEXT_PADDING, yPosition + 5);
+    drawBox(margin + 25, yPosition, infoBoxWidth - 25, 7);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(pi.bloodType || 'N/A', margin + 26, yPosition + 5);
+    yPosition += 7;
+
+    // Government IDs (Fields 10-15) - 2-column layout
+    checkPageBreak(40);
+    yPosition = drawLabelValueBox('10. GSIS ID NO.', pi.gsisNo || 'N/A', margin, yPosition, 40, contentWidth / 2 - 40);
+    yPosition -= 7;
+    yPosition = drawLabelValueBox('11. PAG-IBIG ID NO.', pi.pagibigNo || 'N/A', margin + contentWidth / 2, yPosition, 40, contentWidth / 2 - 40);
+
+    yPosition = drawLabelValueBox('12. PHILHEALTH NO.', pi.philhealthNo || 'N/A', margin, yPosition, 40, contentWidth / 2 - 40);
+    yPosition -= 7;
+    yPosition = drawLabelValueBox('13. SSS NO.', pi.sssNo || 'N/A', margin + contentWidth / 2, yPosition, 40, contentWidth / 2 - 40);
+
+    yPosition = drawLabelValueBox('14. TIN NO.', pi.tinNo || 'N/A', margin, yPosition, 40, contentWidth / 2 - 40);
+    yPosition -= 7;
+    yPosition = drawLabelValueBox('15. AGENCY EMPLOYEE NO.', pi.agencyEmployeeNo || 'N/A', margin + contentWidth / 2, yPosition, 40, contentWidth / 2 - 40);
+
+    // Citizenship (Field 16) with checkboxes
+    yPosition = drawLabelValueBox('16. CITIZENSHIP', '', margin, yPosition, 40, contentWidth - 40, 8);
+    yPosition -= 8; // Return to same position for checkbox content
+    const citizenshipY = yPosition + 2;
+
+    // Filipino checkbox
+    drawCheckbox(margin + 42, citizenshipY, pi.citizenship === 'Filipino');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Filipino', margin + 46, citizenshipY + 2.5);
+
+    // Dual Citizenship checkbox
+    drawCheckbox(margin + 70, citizenshipY, pi.citizenship === 'Dual Citizenship');
+    doc.text('Dual Citizenship', margin + 74, citizenshipY + 2.5);
+    yPosition += 8; // Move to next row
+
+    // If dual citizenship, show additional options
     if (pi.citizenship === 'Dual Citizenship') {
-      yPosition = drawLabelValueBox('    DUAL CITIZENSHIP TYPE', pi.dualCitizenshipType || 'N/A', margin, yPosition, 50, contentWidth - 50, 6);
-      yPosition = drawLabelValueBox('    COUNTRY', pi.dualCitizenshipCountry || 'N/A', margin, yPosition, 50, contentWidth - 50, 6);
+      const dualY = yPosition + 2;
+      doc.setFontSize(7);
+      doc.setFont('helvetica', 'italic');
+      doc.text('If holder of dual citizenship, indicate the details:', margin + 42, dualY);
+      yPosition += 6;
+
+      const optionsY = yPosition + 2;
+      drawCheckbox(margin + 42, optionsY, pi.dualCitizenshipType === 'by birth');
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text('by birth', margin + 46, optionsY + 2.5);
+
+      drawCheckbox(margin + 70, optionsY, pi.dualCitizenshipType === 'by naturalization');
+      doc.text('by naturalization', margin + 74, optionsY + 2.5);
+      yPosition += 6;
+
+      yPosition = drawLabelValueBox('    Pls. indicate country:', pi.dualCitizenshipCountry || 'N/A', margin + 40, yPosition, 50, contentWidth - 90, 6);
     }
 
-    // Residential Address
+    // Residential Address (Field 17)
     yPosition = drawLabelValueBox(
-      '11. RESIDENTIAL ADDRESS',
+      '17. RESIDENTIAL ADDRESS',
       [
         pi.residentialAddress?.houseBlockLotNo,
         pi.residentialAddress?.street,
@@ -257,7 +373,7 @@ export async function generateCSCFormatPDF(
     // ZIP CODE
     yPosition = drawLabelValueBox('    ZIP CODE', pi.residentialAddress?.zipCode || 'N/A', margin, yPosition, 40, contentWidth - 40);
 
-    // Permanent Address
+    // Permanent Address (Field 18)
     const permAddress = pi.permanentAddress?.sameAsResidential
       ? 'Same as Residential Address'
       : [
@@ -270,27 +386,13 @@ export async function generateCSCFormatPDF(
           pi.permanentAddress?.zipCode,
         ].filter(Boolean).join(', ') || 'N/A';
 
-    yPosition = drawLabelValueBox('12. PERMANENT ADDRESS', permAddress, margin, yPosition, 40, contentWidth - 40, 12);
+    yPosition = drawLabelValueBox('18. PERMANENT ADDRESS', permAddress, margin, yPosition, 40, contentWidth - 40, 12);
     yPosition = drawLabelValueBox('    ZIP CODE', pi.permanentAddress?.sameAsResidential ? pi.residentialAddress?.zipCode || 'N/A' : pi.permanentAddress?.zipCode || 'N/A', margin, yPosition, 40, contentWidth - 40);
 
-    // Contact Info
-    yPosition = drawLabelValueBox('13. TELEPHONE NO.', pi.telephoneNo || 'N/A', margin, yPosition, 40, contentWidth - 40);
-    yPosition = drawLabelValueBox('14. MOBILE NO.', pi.mobileNo || 'N/A', margin, yPosition, 40, contentWidth - 40);
-    yPosition = drawLabelValueBox('15. E-MAIL ADDRESS', pi.emailAddress || 'N/A', margin, yPosition, 40, contentWidth - 40);
-
-    // Government IDs
-    checkPageBreak(40);
-    yPosition = drawLabelValueBox('16. GSIS ID NO.', pi.umidNo || 'N/A', margin, yPosition, 40, contentWidth / 2 - 40);
-    yPosition -= 7;
-    yPosition = drawLabelValueBox('17. PAG-IBIG ID NO.', pi.pagibigNo || 'N/A', margin + contentWidth / 2, yPosition, 40, contentWidth / 2 - 40);
-
-    yPosition = drawLabelValueBox('18. PHILHEALTH NO.', pi.philhealthNo || 'N/A', margin, yPosition, 40, contentWidth / 2 - 40);
-    yPosition -= 7;
-    yPosition = drawLabelValueBox('19. SSS NO.', pi.philsysNo || 'N/A', margin + contentWidth / 2, yPosition, 40, contentWidth / 2 - 40);
-
-    yPosition = drawLabelValueBox('20. TIN NO.', pi.tinNo || 'N/A', margin, yPosition, 40, contentWidth / 2 - 40);
-    yPosition -= 7;
-    yPosition = drawLabelValueBox('21. AGENCY EMPLOYEE NO.', pi.agencyEmployeeNo || 'N/A', margin + contentWidth / 2, yPosition, 40, contentWidth / 2 - 40);
+    // Contact Info (Fields 19-21)
+    yPosition = drawLabelValueBox('19. TELEPHONE NO.', pi.telephoneNo || 'N/A', margin, yPosition, 40, contentWidth - 40);
+    yPosition = drawLabelValueBox('20. MOBILE NO.', pi.mobileNo || 'N/A', margin, yPosition, 40, contentWidth - 40);
+    yPosition = drawLabelValueBox('21. E-MAIL ADDRESS (if any)', pi.emailAddress || 'N/A', margin, yPosition, 40, contentWidth - 40);
   }
 
   yPosition += 3;
@@ -406,52 +508,67 @@ export async function generateCSCFormatPDF(
   doc.text('III. EDUCATIONAL BACKGROUND', margin + 2, yPosition + 5);
   yPosition += 7;
 
-  // Table header
+  // Table header - Updated to match official template with separate From/To and Honors columns
   const colWidths = {
-    level: contentWidth * 0.15,
-    school: contentWidth * 0.30,
-    course: contentWidth * 0.25,
-    period: contentWidth * 0.15,
-    units: contentWidth * 0.08,
-    year: contentWidth * 0.07,
+    level: contentWidth * 0.12,       // Level
+    school: contentWidth * 0.26,      // School Name
+    course: contentWidth * 0.22,      // Course/Degree
+    periodFrom: contentWidth * 0.08,  // From (split from period)
+    periodTo: contentWidth * 0.08,    // To (split from period)
+    units: contentWidth * 0.08,       // Units/Level
+    year: contentWidth * 0.08,        // Year Graduated
+    honors: contentWidth * 0.08,      // Honors/Awards (NEW)
   };
 
-  drawBox(margin, yPosition, colWidths.level, 12);
-  drawBox(margin + colWidths.level, yPosition, colWidths.school, 12);
-  drawBox(margin + colWidths.level + colWidths.school, yPosition, colWidths.course, 12);
-  drawBox(margin + colWidths.level + colWidths.school + colWidths.course, yPosition, colWidths.period, 12);
-  drawBox(margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period, yPosition, colWidths.units, 12);
-  drawBox(margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units, yPosition, colWidths.year, 12);
+  // Draw header boxes for all 8 columns
+  let colX = margin;
+  drawBox(colX, yPosition, colWidths.level, 12); colX += colWidths.level;
+  drawBox(colX, yPosition, colWidths.school, 12); colX += colWidths.school;
+  drawBox(colX, yPosition, colWidths.course, 12); colX += colWidths.course;
+  drawBox(colX, yPosition, colWidths.periodFrom, 12); colX += colWidths.periodFrom;
+  drawBox(colX, yPosition, colWidths.periodTo, 12); colX += colWidths.periodTo;
+  drawBox(colX, yPosition, colWidths.units, 12); colX += colWidths.units;
+  drawBox(colX, yPosition, colWidths.year, 12); colX += colWidths.year;
+  drawBox(colX, yPosition, colWidths.honors, 12);
 
+  // Fill headers with gray background
   doc.setFillColor(240, 240, 240);
-  doc.rect(margin, yPosition, colWidths.level, 12, 'F');
-  doc.rect(margin + colWidths.level, yPosition, colWidths.school, 12, 'F');
-  doc.rect(margin + colWidths.level + colWidths.school, yPosition, colWidths.course, 12, 'F');
-  doc.rect(margin + colWidths.level + colWidths.school + colWidths.course, yPosition, colWidths.period, 12, 'F');
-  doc.rect(margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period, yPosition, colWidths.units, 12, 'F');
-  doc.rect(margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units, yPosition, colWidths.year, 12, 'F');
+  colX = margin;
+  doc.rect(colX, yPosition, colWidths.level, 12, 'F'); colX += colWidths.level;
+  doc.rect(colX, yPosition, colWidths.school, 12, 'F'); colX += colWidths.school;
+  doc.rect(colX, yPosition, colWidths.course, 12, 'F'); colX += colWidths.course;
+  doc.rect(colX, yPosition, colWidths.periodFrom, 12, 'F'); colX += colWidths.periodFrom;
+  doc.rect(colX, yPosition, colWidths.periodTo, 12, 'F'); colX += colWidths.periodTo;
+  doc.rect(colX, yPosition, colWidths.units, 12, 'F'); colX += colWidths.units;
+  doc.rect(colX, yPosition, colWidths.year, 12, 'F'); colX += colWidths.year;
+  doc.rect(colX, yPosition, colWidths.honors, 12, 'F');
 
+  // Add header labels - use TEXT_PADDING for consistent spacing
   doc.setFontSize(6);
   doc.setFont('helvetica', 'bold');
-  doc.text('26. LEVEL', margin + TEXT_PADDING, yPosition + 6);
-  doc.text('27. NAME OF SCHOOL', margin + colWidths.level + TEXT_PADDING, yPosition + 6);
-  doc.text('28. BASIC EDUCATION/DEGREE/COURSE', margin + colWidths.level + colWidths.school + TEXT_PADDING, yPosition + 6);
-  doc.text('29. PERIOD OF', margin + colWidths.level + colWidths.school + colWidths.course + TEXT_PADDING, yPosition + 4);
-  doc.text('ATTENDANCE', margin + colWidths.level + colWidths.school + colWidths.course + TEXT_PADDING, yPosition + 8);
-  doc.text('(From-To)', margin + colWidths.level + colWidths.school + colWidths.course + TEXT_PADDING, yPosition + 11);
-  doc.text('30. HIGHEST', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + TEXT_PADDING, yPosition + 4);
-  doc.text('LEVEL/', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + TEXT_PADDING, yPosition + 7);
-  doc.text('UNITS', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + TEXT_PADDING, yPosition + 10);
-  doc.text('31. YEAR', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + TEXT_PADDING, yPosition + 4);
-  doc.text('GRAD.', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + TEXT_PADDING, yPosition + 8);
+  colX = margin;
+  doc.text('26. LEVEL', colX + TEXT_PADDING, yPosition + 6); colX += colWidths.level;
+  doc.text('27. NAME OF', colX + TEXT_PADDING, yPosition + 4);
+  doc.text('SCHOOL', colX + TEXT_PADDING, yPosition + 8); colX += colWidths.school;
+  doc.text('28. BASIC EDUC/', colX + TEXT_PADDING, yPosition + 4);
+  doc.text('DEGREE/COURSE', colX + TEXT_PADDING, yPosition + 8); colX += colWidths.course;
+  doc.text('29. FROM', colX + TEXT_PADDING, yPosition + 6); colX += colWidths.periodFrom;
+  doc.text('TO', colX + TEXT_PADDING, yPosition + 6); colX += colWidths.periodTo;
+  doc.text('30. UNITS', colX + TEXT_PADDING, yPosition + 4);
+  doc.text('EARNED', colX + TEXT_PADDING, yPosition + 8); colX += colWidths.units;
+  doc.text('31. YEAR', colX + TEXT_PADDING, yPosition + 4);
+  doc.text('GRAD.', colX + TEXT_PADDING, yPosition + 8); colX += colWidths.year;
+  doc.text('32.HONORS', colX + TEXT_PADDING, yPosition + 4);
+  doc.text('RECEIVED', colX + TEXT_PADDING, yPosition + 8);
   yPosition += 12;
 
   if (pdsData.educationalBackground && pdsData.educationalBackground.length > 0) {
     pdsData.educationalBackground.forEach((edu) => {
       // Calculate required height for each column BEFORE drawing
       doc.setFontSize(7); // Ensure 7pt font for accurate text splitting
-      const schoolLines = doc.splitTextToSize(edu.nameOfSchool || 'N/A', colWidths.school - 2);
-      const courseLines = doc.splitTextToSize(edu.basicEducationDegreeCourse || 'N/A', colWidths.course - 2);
+      // Use TEXT_PADDING for proper text wrapping within columns
+      const schoolLines = doc.splitTextToSize(edu.nameOfSchool || 'N/A', colWidths.school - (2 * TEXT_PADDING));
+      const courseLines = doc.splitTextToSize(edu.basicEducationDegreeCourse || 'N/A', colWidths.course - (2 * TEXT_PADDING));
 
       // Find maximum lines among all columns
       const maxLines = Math.max(schoolLines.length, courseLines.length, 2); // Minimum 2 lines
@@ -464,42 +581,57 @@ export async function generateCSCFormatPDF(
 
       checkPageBreak(rowHeight);
 
-      // Draw boxes with dynamic height
-      drawBox(margin, yPosition, colWidths.level, rowHeight);
-      drawBox(margin + colWidths.level, yPosition, colWidths.school, rowHeight);
-      drawBox(margin + colWidths.level + colWidths.school, yPosition, colWidths.course, rowHeight);
-      drawBox(margin + colWidths.level + colWidths.school + colWidths.course, yPosition, colWidths.period, rowHeight);
-      drawBox(margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period, yPosition, colWidths.units, rowHeight);
-      drawBox(margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units, yPosition, colWidths.year, rowHeight);
+      // Draw boxes with dynamic height for all 8 columns
+      colX = margin;
+      drawBox(colX, yPosition, colWidths.level, rowHeight); colX += colWidths.level;
+      drawBox(colX, yPosition, colWidths.school, rowHeight); colX += colWidths.school;
+      drawBox(colX, yPosition, colWidths.course, rowHeight); colX += colWidths.course;
+      drawBox(colX, yPosition, colWidths.periodFrom, rowHeight); colX += colWidths.periodFrom;
+      drawBox(colX, yPosition, colWidths.periodTo, rowHeight); colX += colWidths.periodTo;
+      drawBox(colX, yPosition, colWidths.units, rowHeight); colX += colWidths.units;
+      drawBox(colX, yPosition, colWidths.year, rowHeight); colX += colWidths.year;
+      drawBox(colX, yPosition, colWidths.honors, rowHeight);
 
       doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
 
-      // Level - centered vertically for single line
+      // Level - centered vertically for single line - use TEXT_PADDING
       const levelYOffset = maxLines === 2 ? 6 : 5;
       doc.text(edu.level || '', margin + TEXT_PADDING, yPosition + levelYOffset);
 
-      // School name - already split above
+      // School name - already split above - use TEXT_PADDING
+      colX = margin + colWidths.level;
       schoolLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + colWidths.level + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, colX + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
-      // Course - already split above
+      // Course - already split above - use TEXT_PADDING
+      colX += colWidths.school;
       courseLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + colWidths.level + colWidths.school + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, colX + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
-      // Period - centered vertically for single line
-      const period = edu.periodOfAttendance
-        ? `${edu.periodOfAttendance.from || ''}-${edu.periodOfAttendance.to || ''}`
-        : 'N/A';
-      doc.text(period, margin + colWidths.level + colWidths.school + colWidths.course + TEXT_PADDING, yPosition + levelYOffset);
+      // Period From - centered vertically - use TEXT_PADDING
+      colX += colWidths.course;
+      const periodFrom = edu.periodOfAttendance?.from || 'N/A';
+      doc.text(periodFrom, colX + TEXT_PADDING, yPosition + levelYOffset);
 
-      // Units - centered vertically for single line
-      doc.text(edu.highestLevelUnitsEarned || 'N/A', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + TEXT_PADDING, yPosition + levelYOffset);
+      // Period To - centered vertically - use TEXT_PADDING
+      colX += colWidths.periodFrom;
+      const periodTo = edu.periodOfAttendance?.to || 'N/A';
+      doc.text(periodTo, colX + TEXT_PADDING, yPosition + levelYOffset);
 
-      // Year graduated - centered vertically for single line
-      doc.text(edu.yearGraduated || 'N/A', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + TEXT_PADDING, yPosition + levelYOffset);
+      // Units - centered vertically - use TEXT_PADDING
+      colX += colWidths.periodTo;
+      doc.text(edu.highestLevelUnitsEarned || 'N/A', colX + TEXT_PADDING, yPosition + levelYOffset);
+
+      // Year graduated - centered vertically - use TEXT_PADDING
+      colX += colWidths.units;
+      doc.text(edu.yearGraduated || 'N/A', colX + TEXT_PADDING, yPosition + levelYOffset);
+
+      // Honors/Awards - centered vertically (NEW) - use TEXT_PADDING
+      colX += colWidths.year;
+      doc.text(edu.honorsReceived || '', colX + TEXT_PADDING, yPosition + levelYOffset);
 
       yPosition += rowHeight;
     });
@@ -643,60 +775,55 @@ export async function generateCSCFormatPDF(
   doc.text('V. WORK EXPERIENCE', margin + 2, yPosition + 5);
   yPosition += 7;
 
-  // Work Experience table header
+  // Work Experience table header - Updated to match official template with separate From/To columns
   const workColWidths = {
-    period: contentWidth * 0.14,
-    position: contentWidth * 0.23,
-    company: contentWidth * 0.23,
-    salary: contentWidth * 0.11,
-    grade: contentWidth * 0.07,
-    step: contentWidth * 0.06,
-    status: contentWidth * 0.08,
-    govt: contentWidth * 0.08,
+    periodFrom: contentWidth * 0.08,  // From (split from period)
+    periodTo: contentWidth * 0.08,    // To (split from period)
+    position: contentWidth * 0.21,    // Position Title
+    company: contentWidth * 0.21,     // Department/Agency/Company
+    salary: contentWidth * 0.11,      // Monthly Salary
+    grade: contentWidth * 0.07,       // Salary Grade
+    step: contentWidth * 0.06,        // Step
+    status: contentWidth * 0.10,      // Status of Appointment
+    govt: contentWidth * 0.08,        // Gov't Service
   };
 
-  drawBox(margin, yPosition, workColWidths.period, 12);
-  drawBox(margin + workColWidths.period, yPosition, workColWidths.position, 12);
-  drawBox(margin + workColWidths.period + workColWidths.position, yPosition, workColWidths.company, 12);
-  drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company, yPosition, workColWidths.salary, 12);
-  drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary, yPosition, workColWidths.grade, 12);
-  drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade, yPosition, workColWidths.step, 12);
-  drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step, yPosition, workColWidths.status, 12);
-  drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status, yPosition, workColWidths.govt, 12);
+  // Draw header boxes for all 9 columns
+  let workColX = margin;
+  drawBox(workColX, yPosition, workColWidths.periodFrom, 12); workColX += workColWidths.periodFrom;
+  drawBox(workColX, yPosition, workColWidths.periodTo, 12); workColX += workColWidths.periodTo;
+  drawBox(workColX, yPosition, workColWidths.position, 12); workColX += workColWidths.position;
+  drawBox(workColX, yPosition, workColWidths.company, 12); workColX += workColWidths.company;
+  drawBox(workColX, yPosition, workColWidths.salary, 12); workColX += workColWidths.salary;
+  drawBox(workColX, yPosition, workColWidths.grade, 12); workColX += workColWidths.grade;
+  drawBox(workColX, yPosition, workColWidths.step, 12); workColX += workColWidths.step;
+  drawBox(workColX, yPosition, workColWidths.status, 12); workColX += workColWidths.status;
+  drawBox(workColX, yPosition, workColWidths.govt, 12);
 
   doc.setFillColor(240, 240, 240);
   doc.rect(margin, yPosition, contentWidth, 12, 'F');
 
+  // Add header labels - use TEXT_PADDING for consistent spacing
   doc.setFontSize(6);
   doc.setFont('helvetica', 'bold');
-  doc.text('38. INCLUSIVE', margin + TEXT_PADDING, yPosition + 4);
-  doc.text('DATES', margin + TEXT_PADDING, yPosition + 7);
-  doc.text('(mm/dd/yyyy)', margin + TEXT_PADDING, yPosition + 10);
-
-  doc.text('39. POSITION', margin + workColWidths.period + TEXT_PADDING, yPosition + 4);
-  doc.text('TITLE', margin + workColWidths.period + TEXT_PADDING, yPosition + 7);
-
-  doc.text('40. DEPARTMENT/', margin + workColWidths.period + workColWidths.position + TEXT_PADDING, yPosition + 3);
-  doc.text('AGENCY/', margin + workColWidths.period + workColWidths.position + TEXT_PADDING, yPosition + 6);
-  doc.text('OFFICE/', margin + workColWidths.period + workColWidths.position + TEXT_PADDING, yPosition + 9);
-  doc.text('COMPANY', margin + workColWidths.period + workColWidths.position + TEXT_PADDING, yPosition + 11.5);
-
-  doc.text('41. MONTHLY', margin + workColWidths.period + workColWidths.position + workColWidths.company + TEXT_PADDING, yPosition + 5);
-  doc.text('SALARY', margin + workColWidths.period + workColWidths.position + workColWidths.company + TEXT_PADDING, yPosition + 8);
-
-  doc.text('42.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + TEXT_PADDING, yPosition + 4);
-  doc.text('SALARY', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + TEXT_PADDING, yPosition + 7);
-  doc.text('GRADE', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + TEXT_PADDING, yPosition + 10);
-
-  doc.text('STEP', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + TEXT_PADDING, yPosition + 7);
-
-  doc.text('43.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + TEXT_PADDING, yPosition + 4);
-  doc.text('STATUS', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + TEXT_PADDING, yPosition + 7);
-  doc.text('OF APPT.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + TEXT_PADDING, yPosition + 10);
-
-  doc.text('44.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + TEXT_PADDING, yPosition + 5);
-  doc.text('GOV\'T', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + TEXT_PADDING, yPosition + 8);
-  doc.text('SERVICE', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + TEXT_PADDING, yPosition + 10.5);
+  workColX = margin;
+  doc.text('38. FROM', workColX + TEXT_PADDING, yPosition + 6); workColX += workColWidths.periodFrom;
+  doc.text('TO', workColX + TEXT_PADDING, yPosition + 6); workColX += workColWidths.periodTo;
+  doc.text('39. POSITION', workColX + TEXT_PADDING, yPosition + 5);
+  doc.text('TITLE', workColX + TEXT_PADDING, yPosition + 8); workColX += workColWidths.position;
+  doc.text('40. DEPT/', workColX + TEXT_PADDING, yPosition + 3);
+  doc.text('AGENCY/', workColX + TEXT_PADDING, yPosition + 6);
+  doc.text('OFFICE/', workColX + TEXT_PADDING, yPosition + 9);
+  doc.text('COMPANY', workColX + TEXT_PADDING, yPosition + 11.5); workColX += workColWidths.company;
+  doc.text('41. MONTHLY', workColX + TEXT_PADDING, yPosition + 5);
+  doc.text('SALARY', workColX + TEXT_PADDING, yPosition + 8); workColX += workColWidths.salary;
+  doc.text('42. SALARY', workColX + TEXT_PADDING, yPosition + 5);
+  doc.text('GRADE', workColX + TEXT_PADDING, yPosition + 8); workColX += workColWidths.grade;
+  doc.text('STEP', workColX + TEXT_PADDING, yPosition + 6); workColX += workColWidths.step;
+  doc.text('43. STATUS', workColX + TEXT_PADDING, yPosition + 5);
+  doc.text('OF APPT.', workColX + TEXT_PADDING, yPosition + 8); workColX += workColWidths.status;
+  doc.text('44. GOV\'T', workColX + TEXT_PADDING, yPosition + 5);
+  doc.text('SERVICE', workColX + TEXT_PADDING, yPosition + 8);
 
   yPosition += 12;
 
@@ -704,14 +831,12 @@ export async function generateCSCFormatPDF(
     pdsData.workExperience.forEach((work) => {
       // Calculate required height for each column BEFORE drawing
       doc.setFontSize(6); // Ensure 6pt font for accurate text splitting
-      const posLines = doc.splitTextToSize(work.positionTitle || 'N/A', workColWidths.position - 2);
-      const companyLines = doc.splitTextToSize(work.departmentAgencyOfficeCompany || 'N/A', workColWidths.company - 2);
+      // Use TEXT_PADDING for proper text wrapping within columns
+      const posLines = doc.splitTextToSize(work.positionTitle || 'N/A', workColWidths.position - (2 * TEXT_PADDING));
+      const companyLines = doc.splitTextToSize(work.departmentAgencyOfficeCompany || 'N/A', workColWidths.company - (2 * TEXT_PADDING));
 
-      // Period always has 2 lines (from and to dates)
-      const periodLines = 2;
-
-      // Find maximum lines among all columns
-      const maxLines = Math.max(posLines.length, companyLines.length, periodLines, 2); // Minimum 2 lines
+      // Find maximum lines among all columns (From/To are now single-line fields)
+      const maxLines = Math.max(posLines.length, companyLines.length, 2); // Minimum 2 lines
 
       // Calculate dynamic row height
       const lineHeight = 3; // mm per line (for 6pt font)
@@ -721,53 +846,59 @@ export async function generateCSCFormatPDF(
 
       checkPageBreak(rowHeight);
 
-      // Draw boxes with dynamic height
-      drawBox(margin, yPosition, workColWidths.period, rowHeight);
-      drawBox(margin + workColWidths.period, yPosition, workColWidths.position, rowHeight);
-      drawBox(margin + workColWidths.period + workColWidths.position, yPosition, workColWidths.company, rowHeight);
-      drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company, yPosition, workColWidths.salary, rowHeight);
-      drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary, yPosition, workColWidths.grade, rowHeight);
-      drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade, yPosition, workColWidths.step, rowHeight);
-      drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step, yPosition, workColWidths.status, rowHeight);
-      drawBox(margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status, yPosition, workColWidths.govt, rowHeight);
+      // Draw boxes with dynamic height for all 9 columns
+      workColX = margin;
+      drawBox(workColX, yPosition, workColWidths.periodFrom, rowHeight); workColX += workColWidths.periodFrom;
+      drawBox(workColX, yPosition, workColWidths.periodTo, rowHeight); workColX += workColWidths.periodTo;
+      drawBox(workColX, yPosition, workColWidths.position, rowHeight); workColX += workColWidths.position;
+      drawBox(workColX, yPosition, workColWidths.company, rowHeight); workColX += workColWidths.company;
+      drawBox(workColX, yPosition, workColWidths.salary, rowHeight); workColX += workColWidths.salary;
+      drawBox(workColX, yPosition, workColWidths.grade, rowHeight); workColX += workColWidths.grade;
+      drawBox(workColX, yPosition, workColWidths.step, rowHeight); workColX += workColWidths.step;
+      drawBox(workColX, yPosition, workColWidths.status, rowHeight); workColX += workColWidths.status;
+      drawBox(workColX, yPosition, workColWidths.govt, rowHeight);
 
       doc.setFontSize(6);
       doc.setFont('helvetica', 'normal');
 
-      // Period - always 2 lines (from and to dates)
-      const period = work.periodOfService
-        ? `${formatDateOnly(work.periodOfService.from) || ''}\n${work.periodOfService.to === 'Present' ? 'Present' : formatDateOnly(work.periodOfService.to) || ''}`
-        : 'N/A';
-      const periodLinesArray = period.split('\n');
-      periodLinesArray.forEach((line, index) => {
-        doc.text(line, margin + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
-      });
-
-      // Position - already split above
-      posLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + workColWidths.period + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
-      });
-
-      // Company - already split above
-      companyLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + workColWidths.period + workColWidths.position + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
-      });
-
-      // Salary - centered vertically for single line
+      // Centered vertical offset for single-line fields
       const singleLineYOffset = maxLines === 2 ? 5 : 6;
-      doc.text(work.monthlySalary ? String(work.monthlySalary) : 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + TEXT_PADDING, yPosition + singleLineYOffset);
 
-      // Grade - centered vertically for single line
-      doc.text(work.salaryGrade || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + TEXT_PADDING, yPosition + singleLineYOffset);
+      // Period From - single line, centered - use TEXT_PADDING
+      workColX = margin;
+      const periodFrom = work.periodOfService?.from ? formatDateOnly(work.periodOfService.from) : 'N/A';
+      doc.text(periodFrom, workColX + TEXT_PADDING, yPosition + singleLineYOffset); workColX += workColWidths.periodFrom;
 
-      // Step - centered vertically for single line
-      doc.text(work.stepIncrement || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + TEXT_PADDING, yPosition + singleLineYOffset);
+      // Period To - single line, centered - use TEXT_PADDING
+      const periodTo = work.periodOfService?.to === 'Present' ? 'Present' : work.periodOfService?.to ? formatDateOnly(work.periodOfService.to) : 'N/A';
+      doc.text(periodTo, workColX + TEXT_PADDING, yPosition + singleLineYOffset); workColX += workColWidths.periodTo;
 
-      // Status - centered vertically for single line
-      doc.text(work.statusOfAppointment || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + TEXT_PADDING, yPosition + singleLineYOffset);
+      // Position - multi-line, already split above - use TEXT_PADDING
+      posLines.forEach((line: string, index: number) => {
+        doc.text(line, workColX + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+      });
+      workColX += workColWidths.position;
 
-      // Govt Service - centered vertically for single line
-      doc.text(work.governmentService ? 'Y' : 'N', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + TEXT_PADDING, yPosition + singleLineYOffset);
+      // Company - multi-line, already split above - use TEXT_PADDING
+      companyLines.forEach((line: string, index: number) => {
+        doc.text(line, workColX + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+      });
+      workColX += workColWidths.company;
+
+      // Salary - single line, centered - use TEXT_PADDING
+      doc.text(work.monthlySalary ? String(work.monthlySalary) : 'N/A', workColX + TEXT_PADDING, yPosition + singleLineYOffset); workColX += workColWidths.salary;
+
+      // Grade - single line, centered - use TEXT_PADDING
+      doc.text(work.salaryGrade || 'N/A', workColX + TEXT_PADDING, yPosition + singleLineYOffset); workColX += workColWidths.grade;
+
+      // Step - single line, centered - use TEXT_PADDING
+      doc.text(work.stepIncrement || 'N/A', workColX + TEXT_PADDING, yPosition + singleLineYOffset); workColX += workColWidths.step;
+
+      // Status - single line, centered - use TEXT_PADDING
+      doc.text(work.statusOfAppointment || 'N/A', workColX + TEXT_PADDING, yPosition + singleLineYOffset); workColX += workColWidths.status;
+
+      // Govt Service - single line, centered (Y/N) - use TEXT_PADDING
+      doc.text(work.governmentService ? 'Y' : 'N', workColX + TEXT_PADDING, yPosition + singleLineYOffset);
 
       yPosition += rowHeight;
     });
@@ -1021,8 +1152,8 @@ export async function generateCSCFormatPDF(
 
       // Pre-calculate text split for both label and value
       doc.setFontSize(7);
-      const labelLines = doc.splitTextToSize(labelText, labelWidth - (2 * TEXT_PADDING));
-      const valueLines = doc.splitTextToSize(valueText, valueWidth - (2 * TEXT_PADDING));
+      const labelLines = doc.splitTextToSize(labelText, labelWidth - 2);
+      const valueLines = doc.splitTextToSize(valueText, valueWidth - 2);
 
       // Calculate dynamic height based on BOTH label and value lines
       const maxLines = Math.max(labelLines.length, valueLines.length, 2); // Minimum 2 lines
@@ -1067,8 +1198,8 @@ export async function generateCSCFormatPDF(
 
       // Pre-calculate text split for both label and value
       doc.setFontSize(7);
-      const labelLines = doc.splitTextToSize(labelText, labelWidth - (2 * TEXT_PADDING));
-      const valueLines = doc.splitTextToSize(valueText, valueWidth - (2 * TEXT_PADDING));
+      const labelLines = doc.splitTextToSize(labelText, labelWidth - 2);
+      const valueLines = doc.splitTextToSize(valueText, valueWidth - 2);
 
       // Calculate dynamic height based on BOTH label and value lines
       const maxLines = Math.max(labelLines.length, valueLines.length, 2); // Minimum 2 lines
@@ -1113,8 +1244,8 @@ export async function generateCSCFormatPDF(
 
       // Pre-calculate text split for both label and value
       doc.setFontSize(7);
-      const labelLines = doc.splitTextToSize(labelText, labelWidth - (2 * TEXT_PADDING));
-      const valueLines = doc.splitTextToSize(valueText, valueWidth - (2 * TEXT_PADDING));
+      const labelLines = doc.splitTextToSize(labelText, labelWidth - 2);
+      const valueLines = doc.splitTextToSize(valueText, valueWidth - 2);
 
       // Calculate dynamic height based on BOTH label and value lines
       const maxLines = Math.max(labelLines.length, valueLines.length, 2); // Minimum 2 lines
@@ -1383,6 +1514,21 @@ export async function generateCSCFormatPDF(
     checkPageBreak(10);
     yPosition = drawLabelValueBox('DATE', formattedDate, margin, yPosition, 30, contentWidth - 30);
   }
+
+  // ============================================================================
+  // Right Thumbmark Box (below signature/date section)
+  // ============================================================================
+  yPosition += 5; // Add spacing
+  const thumbBoxWidth = 40;
+  const thumbBoxHeight = 30;
+  const thumbBoxX = pageWidth - margin - thumbBoxWidth;
+
+  checkPageBreak(thumbBoxHeight + 8);
+
+  drawBox(thumbBoxX, yPosition, thumbBoxWidth, thumbBoxHeight);
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold');
+  doc.text('RIGHT THUMBMARK', thumbBoxX + thumbBoxWidth / 2, yPosition + thumbBoxHeight + 4, { align: 'center' });
 
   // ============================================================================
   // Download or return

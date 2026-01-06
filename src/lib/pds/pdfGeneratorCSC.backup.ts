@@ -25,26 +25,6 @@ export async function generateCSCFormatPDF(
   const margin = 10;
   const contentWidth = pageWidth - 2 * margin;
 
-  // ============================================================================
-  // CONFIGURATION CONSTANTS - To match official CS Form No. 212, Revised 2025
-  // ============================================================================
-
-  // Padding configuration (in mm) - ensures text stays inside borders
-  const TEXT_PADDING = 2;           // 2mm from left/right edges of boxes
-  const VERTICAL_PADDING = 1.5;     // 1.5mm from top/bottom edges
-
-  // Font size hierarchy (in points)
-  const FONT_SIZES = {
-    sectionHeader: 9,      // Section titles (I. PERSONAL INFORMATION)
-    fieldLabel: 7,         // Label text in boxes (gray backgrounds)
-    fieldValue: 8,         // Normal value text
-    tableHeader: 6,        // Table column headers
-    tableContent: 7,       // Table cell content
-  };
-
-  // Line height multiplier for proper text spacing
-  const LINE_HEIGHT_MULTIPLIER = 0.4;  // 40% of font size in mm (Helvetica)
-
   let yPosition = margin;
   let pageNumber = 1;
 
@@ -77,7 +57,7 @@ export async function generateCSCFormatPDF(
     doc.rect(x, y, width, height);
   };
 
-  // Helper: Draw text in box with proper padding (text stays inside borders)
+  // Helper: Draw text in box
   const drawTextInBox = (
     text: string,
     x: number,
@@ -90,25 +70,17 @@ export async function generateCSCFormatPDF(
     doc.setFontSize(fontSize);
     doc.setFont('helvetica', bold ? 'bold' : 'normal');
 
-    // Calculate available width for text (subtract padding from both sides)
-    const availableWidth = width - (2 * TEXT_PADDING);
-
-    // Word wrap text to fit within available width
-    const lines = doc.splitTextToSize(text, availableWidth);
-
-    // Calculate line height using multiplier (more accurate than fixed 0.35)
-    const lineHeight = fontSize * LINE_HEIGHT_MULTIPLIER;
-
-    // Calculate starting Y position with proper vertical padding
-    const textY = y + VERTICAL_PADDING + (fontSize * 0.35); // 0.35 = baseline offset
+    // Word wrap if text is too long
+    const lines = doc.splitTextToSize(text, width - 2);
+    const lineHeight = fontSize * 0.35;
+    const textY = y + height / 2 + (lines.length * lineHeight) / 4;
 
     lines.forEach((line: string, index: number) => {
-      // Render text with left padding to stay inside border
-      doc.text(line, x + TEXT_PADDING, textY + (index * lineHeight));
+      doc.text(line, x + 1, textY + index * lineHeight);
     });
   };
 
-  // Helper: Draw label + value box (with proper padding)
+  // Helper: Draw label + value box
   const drawLabelValueBox = (
     label: string,
     value: string,
@@ -118,15 +90,15 @@ export async function generateCSCFormatPDF(
     valueWidth: number,
     height: number = 7
   ) => {
-    // Label box with gray background
+    // Label box
     drawBox(x, y, labelWidth, height);
     doc.setFillColor(240, 240, 240);
     doc.rect(x, y, labelWidth, height, 'F');
-    drawTextInBox(label, x, y, labelWidth, height, FONT_SIZES.fieldLabel, true);
+    drawTextInBox(label, x, y, labelWidth, height, 7, true);
 
     // Value box
     drawBox(x + labelWidth, y, valueWidth, height);
-    drawTextInBox(value, x + labelWidth, y, valueWidth, height, FONT_SIZES.fieldValue);
+    drawTextInBox(value, x + labelWidth, y, valueWidth, height, 8);
 
     return y + height;
   };
@@ -189,10 +161,10 @@ export async function generateCSCFormatPDF(
 
     doc.setFontSize(7);
     doc.setFont('helvetica', 'bold');
-    doc.text('2. SURNAME', margin + TEXT_PADDING, yPosition + 5);
-    doc.text('FIRST NAME', margin + contentWidth / 4 + TEXT_PADDING, yPosition + 5);
-    doc.text('MIDDLE NAME', margin + contentWidth / 2 + TEXT_PADDING, yPosition + 5);
-    doc.text('NAME EXTENSION (JR., SR)', margin + 3 * contentWidth / 4 + TEXT_PADDING, yPosition + 5);
+    doc.text('2. SURNAME', margin + 1, yPosition + 5);
+    doc.text('FIRST NAME', margin + contentWidth / 4 + 1, yPosition + 5);
+    doc.text('MIDDLE NAME', margin + contentWidth / 2 + 1, yPosition + 5);
+    doc.text('NAME EXTENSION (JR., SR)', margin + 3 * contentWidth / 4 + 1, yPosition + 5);
     yPosition += 7;
 
     // Name values (row 2)
@@ -203,10 +175,10 @@ export async function generateCSCFormatPDF(
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text((pi.surname || '').toUpperCase(), margin + TEXT_PADDING, yPosition + 5);
-    doc.text((pi.firstName || '').toUpperCase(), margin + contentWidth / 4 + TEXT_PADDING, yPosition + 5);
-    doc.text((pi.middleName || '').toUpperCase(), margin + contentWidth / 2 + TEXT_PADDING, yPosition + 5);
-    doc.text((pi.nameExtension || '').toUpperCase(), margin + 3 * contentWidth / 4 + TEXT_PADDING, yPosition + 5);
+    doc.text((pi.surname || '').toUpperCase(), margin + 1, yPosition + 5);
+    doc.text((pi.firstName || '').toUpperCase(), margin + contentWidth / 4 + 1, yPosition + 5);
+    doc.text((pi.middleName || '').toUpperCase(), margin + contentWidth / 2 + 1, yPosition + 5);
+    doc.text((pi.nameExtension || '').toUpperCase(), margin + 3 * contentWidth / 4 + 1, yPosition + 5);
     yPosition += 8;
 
     // Date of birth row
@@ -341,7 +313,7 @@ export async function generateCSCFormatPDF(
       doc.rect(margin, yPosition, contentWidth, 7, 'F');
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.text('25. NAME OF CHILDREN (Write full name and list all)', margin + TEXT_PADDING, yPosition + 5);
+      doc.text('25. NAME OF CHILDREN (Write full name and list all)', margin + 1, yPosition + 5);
       yPosition += 7;
 
       // Children header
@@ -351,8 +323,8 @@ export async function generateCSCFormatPDF(
       doc.rect(margin, yPosition, contentWidth * 0.7, 6, 'F');
       doc.rect(margin + contentWidth * 0.7, yPosition, contentWidth * 0.3, 6, 'F');
       doc.setFontSize(7);
-      doc.text('NAME', margin + TEXT_PADDING, yPosition + 4);
-      doc.text('DATE OF BIRTH (mm/dd/yyyy)', margin + contentWidth * 0.7 + TEXT_PADDING, yPosition + 4);
+      doc.text('NAME', margin + 1, yPosition + 4);
+      doc.text('DATE OF BIRTH (mm/dd/yyyy)', margin + contentWidth * 0.7 + 1, yPosition + 4);
       yPosition += 6;
 
       fb.children.forEach((child) => {
@@ -379,12 +351,12 @@ export async function generateCSCFormatPDF(
 
         // Name - already split above
         nameLines.forEach((line: string, index: number) => {
-          doc.text(line, margin + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+          doc.text(line, margin + 1, yPosition + paddingTop + 1 + index * lineHeight);
         });
 
         // Date of Birth - centered vertically for single line
         const dobYOffset = maxLines === 1 ? 4 : paddingTop + 1;
-        doc.text(formatDateOnly(child.dateOfBirth) || 'N/A', margin + contentWidth * 0.7 + TEXT_PADDING, yPosition + dobYOffset);
+        doc.text(formatDateOnly(child.dateOfBirth) || 'N/A', margin + contentWidth * 0.7 + 1, yPosition + dobYOffset);
 
         yPosition += rowHeight;
       });
@@ -433,17 +405,17 @@ export async function generateCSCFormatPDF(
 
   doc.setFontSize(6);
   doc.setFont('helvetica', 'bold');
-  doc.text('26. LEVEL', margin + TEXT_PADDING, yPosition + 6);
-  doc.text('27. NAME OF SCHOOL', margin + colWidths.level + TEXT_PADDING, yPosition + 6);
-  doc.text('28. BASIC EDUCATION/DEGREE/COURSE', margin + colWidths.level + colWidths.school + TEXT_PADDING, yPosition + 6);
-  doc.text('29. PERIOD OF', margin + colWidths.level + colWidths.school + colWidths.course + TEXT_PADDING, yPosition + 4);
-  doc.text('ATTENDANCE', margin + colWidths.level + colWidths.school + colWidths.course + TEXT_PADDING, yPosition + 8);
-  doc.text('(From-To)', margin + colWidths.level + colWidths.school + colWidths.course + TEXT_PADDING, yPosition + 11);
-  doc.text('30. HIGHEST', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + TEXT_PADDING, yPosition + 4);
-  doc.text('LEVEL/', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + TEXT_PADDING, yPosition + 7);
-  doc.text('UNITS', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + TEXT_PADDING, yPosition + 10);
-  doc.text('31. YEAR', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + TEXT_PADDING, yPosition + 4);
-  doc.text('GRAD.', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + TEXT_PADDING, yPosition + 8);
+  doc.text('26. LEVEL', margin + 1, yPosition + 6);
+  doc.text('27. NAME OF SCHOOL', margin + colWidths.level + 1, yPosition + 6);
+  doc.text('28. BASIC EDUCATION/DEGREE/COURSE', margin + colWidths.level + colWidths.school + 1, yPosition + 6);
+  doc.text('29. PERIOD OF', margin + colWidths.level + colWidths.school + colWidths.course + 1, yPosition + 4);
+  doc.text('ATTENDANCE', margin + colWidths.level + colWidths.school + colWidths.course + 1, yPosition + 8);
+  doc.text('(From-To)', margin + colWidths.level + colWidths.school + colWidths.course + 1, yPosition + 11);
+  doc.text('30. HIGHEST', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + 1, yPosition + 4);
+  doc.text('LEVEL/', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + 1, yPosition + 7);
+  doc.text('UNITS', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + 1, yPosition + 10);
+  doc.text('31. YEAR', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + 1, yPosition + 4);
+  doc.text('GRAD.', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + 1, yPosition + 8);
   yPosition += 12;
 
   if (pdsData.educationalBackground && pdsData.educationalBackground.length > 0) {
@@ -477,29 +449,29 @@ export async function generateCSCFormatPDF(
 
       // Level - centered vertically for single line
       const levelYOffset = maxLines === 2 ? 6 : 5;
-      doc.text(edu.level || '', margin + TEXT_PADDING, yPosition + levelYOffset);
+      doc.text(edu.level || '', margin + 1, yPosition + levelYOffset);
 
       // School name - already split above
       schoolLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + colWidths.level + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, margin + colWidths.level + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
       // Course - already split above
       courseLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + colWidths.level + colWidths.school + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, margin + colWidths.level + colWidths.school + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
       // Period - centered vertically for single line
       const period = edu.periodOfAttendance
         ? `${edu.periodOfAttendance.from || ''}-${edu.periodOfAttendance.to || ''}`
         : 'N/A';
-      doc.text(period, margin + colWidths.level + colWidths.school + colWidths.course + TEXT_PADDING, yPosition + levelYOffset);
+      doc.text(period, margin + colWidths.level + colWidths.school + colWidths.course + 1, yPosition + levelYOffset);
 
       // Units - centered vertically for single line
-      doc.text(edu.highestLevelUnitsEarned || 'N/A', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + TEXT_PADDING, yPosition + levelYOffset);
+      doc.text(edu.highestLevelUnitsEarned || 'N/A', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + 1, yPosition + levelYOffset);
 
       // Year graduated - centered vertically for single line
-      doc.text(edu.yearGraduated || 'N/A', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + TEXT_PADDING, yPosition + levelYOffset);
+      doc.text(edu.yearGraduated || 'N/A', margin + colWidths.level + colWidths.school + colWidths.course + colWidths.period + colWidths.units + 1, yPosition + levelYOffset);
 
       yPosition += rowHeight;
     });
@@ -542,26 +514,26 @@ export async function generateCSCFormatPDF(
 
   doc.setFontSize(6);
   doc.setFont('helvetica', 'bold');
-  doc.text('32. CAREER SERVICE/', margin + TEXT_PADDING, yPosition + 4);
-  doc.text('RA 1080 (BOARD/', margin + TEXT_PADDING, yPosition + 7);
-  doc.text('BAR) UNDER SPECIAL LAWS/', margin + TEXT_PADDING, yPosition + 9.5);
+  doc.text('32. CAREER SERVICE/', margin + 1, yPosition + 4);
+  doc.text('RA 1080 (BOARD/', margin + 1, yPosition + 7);
+  doc.text('BAR) UNDER SPECIAL LAWS/', margin + 1, yPosition + 9.5);
 
-  doc.text('33. RATING', margin + eligColWidths.career + TEXT_PADDING, yPosition + 6);
-  doc.text('(If Applicable)', margin + eligColWidths.career + TEXT_PADDING, yPosition + 9);
+  doc.text('33. RATING', margin + eligColWidths.career + 1, yPosition + 6);
+  doc.text('(If Applicable)', margin + eligColWidths.career + 1, yPosition + 9);
 
-  doc.text('34. DATE OF', margin + eligColWidths.career + eligColWidths.rating + TEXT_PADDING, yPosition + 4);
-  doc.text('EXAMINATION /', margin + eligColWidths.career + eligColWidths.rating + TEXT_PADDING, yPosition + 7);
-  doc.text('CONFERMENT', margin + eligColWidths.career + eligColWidths.rating + TEXT_PADDING, yPosition + 9.5);
+  doc.text('34. DATE OF', margin + eligColWidths.career + eligColWidths.rating + 1, yPosition + 4);
+  doc.text('EXAMINATION /', margin + eligColWidths.career + eligColWidths.rating + 1, yPosition + 7);
+  doc.text('CONFERMENT', margin + eligColWidths.career + eligColWidths.rating + 1, yPosition + 9.5);
 
-  doc.text('35. PLACE OF', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + TEXT_PADDING, yPosition + 4);
-  doc.text('EXAMINATION /', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + TEXT_PADDING, yPosition + 7);
-  doc.text('CONFERMENT', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + TEXT_PADDING, yPosition + 9.5);
+  doc.text('35. PLACE OF', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + 1, yPosition + 4);
+  doc.text('EXAMINATION /', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + 1, yPosition + 7);
+  doc.text('CONFERMENT', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + 1, yPosition + 9.5);
 
-  doc.text('36. LICENSE', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + TEXT_PADDING, yPosition + 5);
-  doc.text('NUMBER', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + TEXT_PADDING, yPosition + 8);
+  doc.text('36. LICENSE', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + 1, yPosition + 5);
+  doc.text('NUMBER', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + 1, yPosition + 8);
 
-  doc.text('37. DATE OF', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + eligColWidths.license + TEXT_PADDING, yPosition + 5);
-  doc.text('VALIDITY', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + eligColWidths.license + TEXT_PADDING, yPosition + 8);
+  doc.text('37. DATE OF', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + eligColWidths.license + 1, yPosition + 5);
+  doc.text('VALIDITY', margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + eligColWidths.license + 1, yPosition + 8);
 
   yPosition += 10;
 
@@ -599,29 +571,29 @@ export async function generateCSCFormatPDF(
 
       // Career Service - already split above
       careerLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, margin + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
       // Rating - centered vertically for single line
       const singleLineYOffset = maxLines === 2 ? 4 : 5;
-      doc.text(elig.rating || 'N/A', margin + eligColWidths.career + TEXT_PADDING, yPosition + singleLineYOffset);
+      doc.text(elig.rating || 'N/A', margin + eligColWidths.career + 1, yPosition + singleLineYOffset);
 
       // Date of Examination - centered vertically for single line
-      doc.text(formatDateOnly(elig.dateOfExaminationConferment) || 'N/A', margin + eligColWidths.career + eligColWidths.rating + TEXT_PADDING, yPosition + singleLineYOffset);
+      doc.text(formatDateOnly(elig.dateOfExaminationConferment) || 'N/A', margin + eligColWidths.career + eligColWidths.rating + 1, yPosition + singleLineYOffset);
 
       // Place of Examination - already split above
       placeLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
       // License Number - already split above
       licenseLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
       // Date of Validity - already split above
       validityLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + eligColWidths.license + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, margin + eligColWidths.career + eligColWidths.rating + eligColWidths.dateExam + eligColWidths.placeExam + eligColWidths.license + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
       yPosition += rowHeight;
@@ -669,34 +641,34 @@ export async function generateCSCFormatPDF(
 
   doc.setFontSize(6);
   doc.setFont('helvetica', 'bold');
-  doc.text('38. INCLUSIVE', margin + TEXT_PADDING, yPosition + 4);
-  doc.text('DATES', margin + TEXT_PADDING, yPosition + 7);
-  doc.text('(mm/dd/yyyy)', margin + TEXT_PADDING, yPosition + 10);
+  doc.text('38. INCLUSIVE', margin + 1, yPosition + 4);
+  doc.text('DATES', margin + 1, yPosition + 7);
+  doc.text('(mm/dd/yyyy)', margin + 1, yPosition + 10);
 
-  doc.text('39. POSITION', margin + workColWidths.period + TEXT_PADDING, yPosition + 4);
-  doc.text('TITLE', margin + workColWidths.period + TEXT_PADDING, yPosition + 7);
+  doc.text('39. POSITION', margin + workColWidths.period + 1, yPosition + 4);
+  doc.text('TITLE', margin + workColWidths.period + 1, yPosition + 7);
 
-  doc.text('40. DEPARTMENT/', margin + workColWidths.period + workColWidths.position + TEXT_PADDING, yPosition + 3);
-  doc.text('AGENCY/', margin + workColWidths.period + workColWidths.position + TEXT_PADDING, yPosition + 6);
-  doc.text('OFFICE/', margin + workColWidths.period + workColWidths.position + TEXT_PADDING, yPosition + 9);
-  doc.text('COMPANY', margin + workColWidths.period + workColWidths.position + TEXT_PADDING, yPosition + 11.5);
+  doc.text('40. DEPARTMENT/', margin + workColWidths.period + workColWidths.position + 1, yPosition + 3);
+  doc.text('AGENCY/', margin + workColWidths.period + workColWidths.position + 1, yPosition + 6);
+  doc.text('OFFICE/', margin + workColWidths.period + workColWidths.position + 1, yPosition + 9);
+  doc.text('COMPANY', margin + workColWidths.period + workColWidths.position + 1, yPosition + 11.5);
 
-  doc.text('41. MONTHLY', margin + workColWidths.period + workColWidths.position + workColWidths.company + TEXT_PADDING, yPosition + 5);
-  doc.text('SALARY', margin + workColWidths.period + workColWidths.position + workColWidths.company + TEXT_PADDING, yPosition + 8);
+  doc.text('41. MONTHLY', margin + workColWidths.period + workColWidths.position + workColWidths.company + 1, yPosition + 5);
+  doc.text('SALARY', margin + workColWidths.period + workColWidths.position + workColWidths.company + 1, yPosition + 8);
 
-  doc.text('42.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + TEXT_PADDING, yPosition + 4);
-  doc.text('SALARY', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + TEXT_PADDING, yPosition + 7);
-  doc.text('GRADE', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + TEXT_PADDING, yPosition + 10);
+  doc.text('42.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + 1, yPosition + 4);
+  doc.text('SALARY', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + 1, yPosition + 7);
+  doc.text('GRADE', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + 1, yPosition + 10);
 
-  doc.text('STEP', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + TEXT_PADDING, yPosition + 7);
+  doc.text('STEP', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + 1, yPosition + 7);
 
-  doc.text('43.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + TEXT_PADDING, yPosition + 4);
-  doc.text('STATUS', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + TEXT_PADDING, yPosition + 7);
-  doc.text('OF APPT.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + TEXT_PADDING, yPosition + 10);
+  doc.text('43.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + 1, yPosition + 4);
+  doc.text('STATUS', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + 1, yPosition + 7);
+  doc.text('OF APPT.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + 1, yPosition + 10);
 
-  doc.text('44.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + TEXT_PADDING, yPosition + 5);
-  doc.text('GOV\'T', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + TEXT_PADDING, yPosition + 8);
-  doc.text('SERVICE', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + TEXT_PADDING, yPosition + 10.5);
+  doc.text('44.', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + 1, yPosition + 5);
+  doc.text('GOV\'T', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + 1, yPosition + 8);
+  doc.text('SERVICE', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + 1, yPosition + 10.5);
 
   yPosition += 12;
 
@@ -740,34 +712,34 @@ export async function generateCSCFormatPDF(
         : 'N/A';
       const periodLinesArray = period.split('\n');
       periodLinesArray.forEach((line, index) => {
-        doc.text(line, margin + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, margin + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
       // Position - already split above
       posLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + workColWidths.period + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, margin + workColWidths.period + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
       // Company - already split above
       companyLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + workColWidths.period + workColWidths.position + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+        doc.text(line, margin + workColWidths.period + workColWidths.position + 1, yPosition + paddingTop + 1 + index * lineHeight);
       });
 
       // Salary - centered vertically for single line
       const singleLineYOffset = maxLines === 2 ? 5 : 6;
-      doc.text(work.monthlySalary ? String(work.monthlySalary) : 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + TEXT_PADDING, yPosition + singleLineYOffset);
+      doc.text(work.monthlySalary ? String(work.monthlySalary) : 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + 1, yPosition + singleLineYOffset);
 
       // Grade - centered vertically for single line
-      doc.text(work.salaryGrade || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + TEXT_PADDING, yPosition + singleLineYOffset);
+      doc.text(work.salaryGrade || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + 1, yPosition + singleLineYOffset);
 
       // Step - centered vertically for single line
-      doc.text(work.stepIncrement || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + TEXT_PADDING, yPosition + singleLineYOffset);
+      doc.text(work.stepIncrement || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + 1, yPosition + singleLineYOffset);
 
       // Status - centered vertically for single line
-      doc.text(work.statusOfAppointment || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + TEXT_PADDING, yPosition + singleLineYOffset);
+      doc.text(work.statusOfAppointment || 'N/A', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + 1, yPosition + singleLineYOffset);
 
       // Govt Service - centered vertically for single line
-      doc.text(work.governmentService ? 'Y' : 'N', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + TEXT_PADDING, yPosition + singleLineYOffset);
+      doc.text(work.governmentService ? 'Y' : 'N', margin + workColWidths.period + workColWidths.position + workColWidths.company + workColWidths.salary + workColWidths.grade + workColWidths.step + workColWidths.status + 1, yPosition + singleLineYOffset);
 
       yPosition += rowHeight;
     });
@@ -806,17 +778,17 @@ export async function generateCSCFormatPDF(
 
   doc.setFontSize(6);
   doc.setFont('helvetica', 'bold');
-  doc.text('45. NAME & ADDRESS OF', margin + TEXT_PADDING, yPosition + 4);
-  doc.text('ORGANIZATION', margin + TEXT_PADDING, yPosition + 7);
+  doc.text('45. NAME & ADDRESS OF', margin + 1, yPosition + 4);
+  doc.text('ORGANIZATION', margin + 1, yPosition + 7);
 
-  doc.text('46. INCLUSIVE DATES', margin + volColWidths.org + TEXT_PADDING, yPosition + 4);
-  doc.text('(mm/dd/yyyy)', margin + volColWidths.org + TEXT_PADDING, yPosition + 7);
+  doc.text('46. INCLUSIVE DATES', margin + volColWidths.org + 1, yPosition + 4);
+  doc.text('(mm/dd/yyyy)', margin + volColWidths.org + 1, yPosition + 7);
 
-  doc.text('47. NUMBER OF', margin + volColWidths.org + volColWidths.period + TEXT_PADDING, yPosition + 4);
-  doc.text('HOURS', margin + volColWidths.org + volColWidths.period + TEXT_PADDING, yPosition + 7);
+  doc.text('47. NUMBER OF', margin + volColWidths.org + volColWidths.period + 1, yPosition + 4);
+  doc.text('HOURS', margin + volColWidths.org + volColWidths.period + 1, yPosition + 7);
 
-  doc.text('48. POSITION / NATURE', margin + volColWidths.org + volColWidths.period + volColWidths.hours + TEXT_PADDING, yPosition + 4);
-  doc.text('OF WORK', margin + volColWidths.org + volColWidths.period + volColWidths.hours + TEXT_PADDING, yPosition + 7);
+  doc.text('48. POSITION / NATURE', margin + volColWidths.org + volColWidths.period + volColWidths.hours + 1, yPosition + 4);
+  doc.text('OF WORK', margin + volColWidths.org + volColWidths.period + volColWidths.hours + 1, yPosition + 7);
 
   yPosition += 10;
 
@@ -854,23 +826,23 @@ export async function generateCSCFormatPDF(
 
       // Organization - already split above
       orgLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + TEXT_PADDING, yPosition + 4 + index * lineHeight);
+        doc.text(line, margin + 1, yPosition + 4 + index * lineHeight);
       });
 
       // Period
       const period = vol.periodOfInvolvement
         ? `${formatDateOnly(vol.periodOfInvolvement.from) || ''} to ${formatDateOnly(vol.periodOfInvolvement.to) || ''}`
         : 'N/A';
-      doc.text(period, margin + volColWidths.org + TEXT_PADDING, yPosition + 6);
+      doc.text(period, margin + volColWidths.org + 1, yPosition + 6);
 
       // Hours
-      doc.text(vol.numberOfHours?.toString() || 'N/A', margin + volColWidths.org + volColWidths.period + TEXT_PADDING, yPosition + 6);
+      doc.text(vol.numberOfHours?.toString() || 'N/A', margin + volColWidths.org + volColWidths.period + 1, yPosition + 6);
 
       // Position - Use font size 6 for better fit and readability
       doc.setFontSize(6);
       // Already split above - posLines
       posLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + volColWidths.org + volColWidths.period + volColWidths.hours + TEXT_PADDING, yPosition + 4 + index * 3);
+        doc.text(line, margin + volColWidths.org + volColWidths.period + volColWidths.hours + 1, yPosition + 4 + index * 3);
       });
       doc.setFontSize(7); // Restore to 7 for consistency
 
@@ -913,21 +885,21 @@ export async function generateCSCFormatPDF(
 
   doc.setFontSize(6);
   doc.setFont('helvetica', 'bold');
-  doc.text('49. TITLE OF LEARNING', margin + TEXT_PADDING, yPosition + 4);
-  doc.text('AND DEVELOPMENT', margin + TEXT_PADDING, yPosition + 7);
+  doc.text('49. TITLE OF LEARNING', margin + 1, yPosition + 4);
+  doc.text('AND DEVELOPMENT', margin + 1, yPosition + 7);
 
-  doc.text('50. INCLUSIVE DATES', margin + trainColWidths.title + TEXT_PADDING, yPosition + 4);
-  doc.text('(mm/dd/yyyy)', margin + trainColWidths.title + TEXT_PADDING, yPosition + 7);
+  doc.text('50. INCLUSIVE DATES', margin + trainColWidths.title + 1, yPosition + 4);
+  doc.text('(mm/dd/yyyy)', margin + trainColWidths.title + 1, yPosition + 7);
 
-  doc.text('51. NUMBER', margin + trainColWidths.title + trainColWidths.period + TEXT_PADDING, yPosition + 4);
-  doc.text('OF HOURS', margin + trainColWidths.title + trainColWidths.period + TEXT_PADDING, yPosition + 7);
+  doc.text('51. NUMBER', margin + trainColWidths.title + trainColWidths.period + 1, yPosition + 4);
+  doc.text('OF HOURS', margin + trainColWidths.title + trainColWidths.period + 1, yPosition + 7);
 
-  doc.text('52. TYPE OF LD', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + TEXT_PADDING, yPosition + 4);
-  doc.text('(Managerial/', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + TEXT_PADDING, yPosition + 7);
-  doc.text('Supervisory/Technical/etc)', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + TEXT_PADDING, yPosition + 9.5);
+  doc.text('52. TYPE OF LD', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + 1, yPosition + 4);
+  doc.text('(Managerial/', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + 1, yPosition + 7);
+  doc.text('Supervisory/Technical/etc)', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + 1, yPosition + 9.5);
 
-  doc.text('53. CONDUCTED/', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + trainColWidths.type + TEXT_PADDING, yPosition + 4);
-  doc.text('SPONSORED BY', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + trainColWidths.type + TEXT_PADDING, yPosition + 7);
+  doc.text('53. CONDUCTED/', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + trainColWidths.type + 1, yPosition + 4);
+  doc.text('SPONSORED BY', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + trainColWidths.type + 1, yPosition + 7);
 
   yPosition += 10;
 
@@ -964,7 +936,7 @@ export async function generateCSCFormatPDF(
 
       // Title - already split above
       titleLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + TEXT_PADDING, yPosition + 4 + index * lineHeight);
+        doc.text(line, margin + 1, yPosition + 4 + index * lineHeight);
       });
 
       // Period - with text wrapping to prevent overlap
@@ -973,20 +945,20 @@ export async function generateCSCFormatPDF(
         : 'N/A';
       const periodLines = doc.splitTextToSize(period, trainColWidths.period - 2);
       periodLines.forEach((line: string, idx: number) => {
-        doc.text(line, margin + trainColWidths.title + TEXT_PADDING, yPosition + 6 + (idx * 3));
+        doc.text(line, margin + trainColWidths.title + 1, yPosition + 6 + (idx * 3));
       });
 
       // Hours
-      doc.text(training.numberOfHours?.toString() || 'N/A', margin + trainColWidths.title + trainColWidths.period + TEXT_PADDING, yPosition + 6);
+      doc.text(training.numberOfHours?.toString() || 'N/A', margin + trainColWidths.title + trainColWidths.period + 1, yPosition + 6);
 
       // Type
-      doc.text(training.typeOfLD || 'N/A', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + TEXT_PADDING, yPosition + 6);
+      doc.text(training.typeOfLD || 'N/A', margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + 1, yPosition + 6);
 
       // Sponsor - Use font size 6 for better fit and readability
       doc.setFontSize(6);
       // Already split above - sponsorLines
       sponsorLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + trainColWidths.type + TEXT_PADDING, yPosition + 4 + index * lineHeight);
+        doc.text(line, margin + trainColWidths.title + trainColWidths.period + trainColWidths.hours + trainColWidths.type + 1, yPosition + 4 + index * lineHeight);
       });
       doc.setFontSize(7); // Restore to 7 for consistency
 
@@ -1021,8 +993,8 @@ export async function generateCSCFormatPDF(
 
       // Pre-calculate text split for both label and value
       doc.setFontSize(7);
-      const labelLines = doc.splitTextToSize(labelText, labelWidth - (2 * TEXT_PADDING));
-      const valueLines = doc.splitTextToSize(valueText, valueWidth - (2 * TEXT_PADDING));
+      const labelLines = doc.splitTextToSize(labelText, labelWidth - 2);
+      const valueLines = doc.splitTextToSize(valueText, valueWidth - 2);
 
       // Calculate dynamic height based on BOTH label and value lines
       const maxLines = Math.max(labelLines.length, valueLines.length, 2); // Minimum 2 lines
@@ -1043,7 +1015,7 @@ export async function generateCSCFormatPDF(
 
       // Render label text line by line
       labelLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + TEXT_PADDING, yPosition + paddingTop + index * lineHeight);
+        doc.text(line, margin + 1, yPosition + paddingTop + index * lineHeight);
       });
 
       // Draw value box
@@ -1052,7 +1024,7 @@ export async function generateCSCFormatPDF(
 
       // Render text lines
       valueLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + labelWidth + TEXT_PADDING, yPosition + paddingTop + index * lineHeight);
+        doc.text(line, margin + labelWidth + 1, yPosition + paddingTop + index * lineHeight);
       });
 
       yPosition += rowHeight;
@@ -1067,8 +1039,8 @@ export async function generateCSCFormatPDF(
 
       // Pre-calculate text split for both label and value
       doc.setFontSize(7);
-      const labelLines = doc.splitTextToSize(labelText, labelWidth - (2 * TEXT_PADDING));
-      const valueLines = doc.splitTextToSize(valueText, valueWidth - (2 * TEXT_PADDING));
+      const labelLines = doc.splitTextToSize(labelText, labelWidth - 2);
+      const valueLines = doc.splitTextToSize(valueText, valueWidth - 2);
 
       // Calculate dynamic height based on BOTH label and value lines
       const maxLines = Math.max(labelLines.length, valueLines.length, 2); // Minimum 2 lines
@@ -1089,7 +1061,7 @@ export async function generateCSCFormatPDF(
 
       // Render label text line by line
       labelLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + TEXT_PADDING, yPosition + paddingTop + index * lineHeight);
+        doc.text(line, margin + 1, yPosition + paddingTop + index * lineHeight);
       });
 
       // Draw value box
@@ -1098,7 +1070,7 @@ export async function generateCSCFormatPDF(
 
       // Render text lines
       valueLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + labelWidth + TEXT_PADDING, yPosition + paddingTop + index * lineHeight);
+        doc.text(line, margin + labelWidth + 1, yPosition + paddingTop + index * lineHeight);
       });
 
       yPosition += rowHeight;
@@ -1113,8 +1085,8 @@ export async function generateCSCFormatPDF(
 
       // Pre-calculate text split for both label and value
       doc.setFontSize(7);
-      const labelLines = doc.splitTextToSize(labelText, labelWidth - (2 * TEXT_PADDING));
-      const valueLines = doc.splitTextToSize(valueText, valueWidth - (2 * TEXT_PADDING));
+      const labelLines = doc.splitTextToSize(labelText, labelWidth - 2);
+      const valueLines = doc.splitTextToSize(valueText, valueWidth - 2);
 
       // Calculate dynamic height based on BOTH label and value lines
       const maxLines = Math.max(labelLines.length, valueLines.length, 2); // Minimum 2 lines
@@ -1135,7 +1107,7 @@ export async function generateCSCFormatPDF(
 
       // Render label text line by line
       labelLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + TEXT_PADDING, yPosition + paddingTop + index * lineHeight);
+        doc.text(line, margin + 1, yPosition + paddingTop + index * lineHeight);
       });
 
       // Draw value box
@@ -1144,7 +1116,7 @@ export async function generateCSCFormatPDF(
 
       // Render text lines
       valueLines.forEach((line: string, index: number) => {
-        doc.text(line, margin + labelWidth + TEXT_PADDING, yPosition + paddingTop + index * lineHeight);
+        doc.text(line, margin + labelWidth + 1, yPosition + paddingTop + index * lineHeight);
       });
 
       yPosition += rowHeight;
@@ -1223,9 +1195,9 @@ export async function generateCSCFormatPDF(
 
       doc.setFontSize(7);
       doc.setFont('helvetica', 'bold');
-      doc.text('NAME', margin + TEXT_PADDING, yPosition + 4);
-      doc.text('ADDRESS', margin + contentWidth / 3 + TEXT_PADDING, yPosition + 4);
-      doc.text('TEL. NO.', margin + 2 * contentWidth / 3 + TEXT_PADDING, yPosition + 4);
+      doc.text('NAME', margin + 1, yPosition + 4);
+      doc.text('ADDRESS', margin + contentWidth / 3 + 1, yPosition + 4);
+      doc.text('TEL. NO.', margin + 2 * contentWidth / 3 + 1, yPosition + 4);
       yPosition += 6;
 
       oi.references.forEach((ref) => {
@@ -1254,17 +1226,17 @@ export async function generateCSCFormatPDF(
 
         // Name - already split above
         nameLines.forEach((line: string, index: number) => {
-          doc.text(line, margin + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+          doc.text(line, margin + 1, yPosition + paddingTop + 1 + index * lineHeight);
         });
 
         // Address - already split above
         addressLines.forEach((line: string, index: number) => {
-          doc.text(line, margin + contentWidth / 3 + TEXT_PADDING, yPosition + paddingTop + 1 + index * lineHeight);
+          doc.text(line, margin + contentWidth / 3 + 1, yPosition + paddingTop + 1 + index * lineHeight);
         });
 
         // Tel No - centered vertically for single line
         const telYOffset = maxLines === 1 ? 4 : paddingTop + 1;
-        doc.text(ref.telephoneNo || 'N/A', margin + 2 * contentWidth / 3 + TEXT_PADDING, yPosition + telYOffset);
+        doc.text(ref.telephoneNo || 'N/A', margin + 2 * contentWidth / 3 + 1, yPosition + telYOffset);
 
         yPosition += rowHeight;
       });
