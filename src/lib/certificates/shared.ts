@@ -166,6 +166,7 @@ export function addCornerDecorations(
 
 /**
  * Truncate text to fit within specified width
+ * @deprecated Use wrapText() for multi-line support instead
  */
 export function truncateText(
   doc: any,
@@ -187,4 +188,93 @@ export function truncateText(
   }
 
   return truncated + '...';
+}
+
+/**
+ * Wrap text into multiple lines that fit within specified width
+ * Uses jsPDF's built-in splitTextToSize for accurate text wrapping
+ *
+ * @param doc - jsPDF document instance
+ * @param text - Text to wrap
+ * @param maxWidth - Maximum width in mm
+ * @param fontSize - Font size in pt
+ * @param lineHeight - Line height multiplier (default 1.2)
+ * @returns Object with wrapped lines array and total height needed
+ */
+export function wrapText(
+  doc: any,
+  text: string,
+  maxWidth: number,
+  fontSize: number,
+  lineHeight: number = 1.2
+): { lines: string[]; height: number } {
+  doc.setFontSize(fontSize);
+
+  // Use jsPDF's built-in text splitting
+  const lines = doc.splitTextToSize(text, maxWidth);
+
+  // Calculate total height needed (fontSize in mm * lineHeight * number of lines)
+  const lineHeightMm = (fontSize * 0.352778) * lineHeight; // Convert pt to mm
+  const totalHeight = lineHeightMm * lines.length;
+
+  return { lines, height: totalHeight };
+}
+
+/**
+ * Add multi-line text to PDF at specified position
+ * Handles line spacing and returns final Y position
+ *
+ * @param doc - jsPDF document instance
+ * @param text - Text to add (will be wrapped)
+ * @param x - X position
+ * @param startY - Starting Y position
+ * @param maxWidth - Maximum width for text wrapping
+ * @param fontSize - Font size in pt
+ * @param alignment - Text alignment ('left' | 'center' | 'right')
+ * @param lineHeight - Line height multiplier (default 1.2)
+ * @returns Final Y position after all lines
+ */
+export function addMultiLineText(
+  doc: any,
+  text: string,
+  x: number,
+  startY: number,
+  maxWidth: number,
+  fontSize: number,
+  alignment: 'left' | 'center' | 'right' = 'center',
+  lineHeight: number = 1.2
+): number {
+  const { lines } = wrapText(doc, text, maxWidth, fontSize, lineHeight);
+  const lineHeightMm = (fontSize * 0.352778) * lineHeight;
+
+  let currentY = startY;
+
+  lines.forEach((line) => {
+    doc.text(line, x, currentY, { align: alignment });
+    currentY += lineHeightMm;
+  });
+
+  return currentY;
+}
+
+/**
+ * Calculate height needed for wrapped text without adding it to PDF
+ * Useful for planning layout before rendering
+ *
+ * @param doc - jsPDF document instance
+ * @param text - Text to measure
+ * @param maxWidth - Maximum width for text wrapping
+ * @param fontSize - Font size in pt
+ * @param lineHeight - Line height multiplier (default 1.2)
+ * @returns Height in mm needed for the wrapped text
+ */
+export function calculateTextHeight(
+  doc: any,
+  text: string,
+  maxWidth: number,
+  fontSize: number,
+  lineHeight: number = 1.2
+): number {
+  const { height } = wrapText(doc, text, maxWidth, fontSize, lineHeight);
+  return height;
 }

@@ -14,6 +14,9 @@ import {
   generateCertificateId,
   addCornerDecorations,
   truncateText,
+  wrapText,
+  addMultiLineText,
+  calculateTextHeight,
 } from '../shared';
 
 /**
@@ -150,13 +153,13 @@ export async function generateClassicFormalCertificate(
   doc.setFont('times', 'normal');
   doc.text('has successfully completed the training program on', centerX, currentY, { align: 'center' });
 
-  // Program Title (Bold, Larger)
+  // Program Title (Bold, Larger) - Multi-line support
   currentY += 10;
   doc.setFontSize(16);
   doc.setFont('times', 'bold');
   doc.setTextColor(45, 80, 22);
-  const programTitle = truncateText(doc, data.program.title, pageWidth - 80, 16);
-  doc.text(programTitle, centerX, currentY, { align: 'center' });
+  // Use multi-line wrapping instead of truncation
+  currentY = addMultiLineText(doc, data.program.title, centerX, currentY, pageWidth - 80, 16, 'center', 1.15);
 
   // Date range
   currentY += 10;
@@ -181,7 +184,7 @@ export async function generateClassicFormalCertificate(
     doc.text(`Facilitated by ${data.program.speaker_name}`, centerX, currentY, { align: 'center' });
   }
 
-  // Skills covered
+  // Skills covered - Display ALL skills with multi-line wrapping
   if (data.program.skills_covered && data.program.skills_covered.length > 0) {
     currentY += 10;
     doc.setFontSize(10);
@@ -192,9 +195,10 @@ export async function generateClassicFormalCertificate(
     currentY += 5;
     doc.setFont('times', 'normal');
     doc.setTextColor(0, 0, 0);
-    const skills = data.program.skills_covered.slice(0, 6).join(' • ');
-    const skillsText = truncateText(doc, skills, pageWidth - 60, 10);
-    doc.text(skillsText, centerX, currentY, { align: 'center' });
+    // Show ALL skills (no slicing), join with bullet separator
+    const skills = data.program.skills_covered.join(' • ');
+    // Use multi-line wrapping instead of truncation
+    currentY = addMultiLineText(doc, skills, centerX, currentY, pageWidth - 60, 10, 'center', 1.3);
   }
 
   // Assessment & Attendance

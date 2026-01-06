@@ -13,6 +13,9 @@ import {
   formatDate,
   generateCertificateId,
   truncateText,
+  wrapText,
+  addMultiLineText,
+  calculateTextHeight,
 } from '../shared';
 
 /**
@@ -100,7 +103,7 @@ export async function generateGovernmentOfficialCertificate(
 
   // ===== CERTIFICATE TITLE =====
   currentY += 12;
-  doc.setFontSize(22);
+  doc.setFontSize(24);
   doc.setFont('times', 'bold');
   doc.setTextColor(30, 58, 138);
   doc.text('CERTIFICATE', centerX, currentY, { align: 'center' });
@@ -135,7 +138,7 @@ export async function generateGovernmentOfficialCertificate(
   const bodyWidth = pageWidth - margin * 2 - 20;
 
   // First paragraph
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   const para1 = `This is to certify that ${data.trainee.full_name.toUpperCase()} has satisfactorily completed `;
   doc.text(para1, bodyX, currentY, { maxWidth: bodyWidth });
   currentY += 10;
@@ -149,15 +152,38 @@ export async function generateGovernmentOfficialCertificate(
   const para3 = `of the Municipality of Asuncion, Province of Ilocos Norte, from ${startDate} to ${endDate}.`;
   doc.text(para3, bodyX, currentY, { maxWidth: bodyWidth });
 
-  // Program details box
+  // Program details box - Dynamic height
   currentY += 15;
-  doc.setFillColor(240, 240, 240);
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
-  const boxHeight = 30;
-  doc.rect(bodyX, currentY, bodyWidth, boxHeight, 'FD');
+  const boxStartY = currentY;
 
-  currentY += 6;
+  // Calculate content height first
+  let boxContentHeight = 6; // Top padding for title
+  boxContentHeight += 5; // TRAINING DETAILS title
+  boxContentHeight += 5; // Duration line
+
+  if (data.program.speaker_name) {
+    boxContentHeight += 5; // Speaker line
+  }
+
+  if (data.program.skills_covered && data.program.skills_covered.length > 0) {
+    boxContentHeight += 5; // Competencies label
+    boxContentHeight += 4; // Spacing before skills
+    const skills = data.program.skills_covered.join(', ');
+    const skillsHeight = calculateTextHeight(doc, skills, bodyWidth - 10, 9, 1.3);
+    boxContentHeight += skillsHeight;
+  }
+
+  boxContentHeight += 6; // Bottom padding
+
+  // Draw box with calculated height
+  const boxHeight = Math.max(boxContentHeight, 30); // Minimum 30mm
+  doc.setFillColor(250, 248, 240); // #FAF8F0 Warm background
+  doc.setDrawColor(245, 158, 11); // #F59E0B Gold border
+  doc.setLineWidth(0.5);
+  doc.rect(bodyX, boxStartY, bodyWidth, boxHeight, 'FD');
+
+  // Add content inside box
+  currentY = boxStartY + 6;
   doc.setFontSize(9);
   doc.setFont('times', 'bold');
   doc.setTextColor(30, 58, 138);
@@ -183,13 +209,16 @@ export async function generateGovernmentOfficialCertificate(
     doc.text('Competencies Acquired:', bodyX + 5, currentY);
     currentY += 4;
     doc.setFont('times', 'normal');
-    const skills = data.program.skills_covered.slice(0, 4).join(', ');
-    const skillsText = truncateText(doc, skills, bodyWidth - 10, 9);
-    doc.text(skillsText, bodyX + 5, currentY);
+    // Show ALL skills (no slicing), join with comma
+    const skills = data.program.skills_covered.join(', ');
+    // Use multi-line wrapping instead of truncation
+    currentY = addMultiLineText(doc, skills, bodyX + 5, currentY, bodyWidth - 10, 9, 'left', 1.3);
   }
 
-  // Performance metrics
-  currentY += boxHeight - 18;
+  // Update currentY to after box
+  currentY = boxStartY + boxHeight;
+
+  // Performance metrics (outside of box)
   if (data.completion.assessment_score !== null || data.completion.attendance_percentage !== null) {
     currentY += 8;
     doc.setFontSize(9);
@@ -211,7 +240,7 @@ export async function generateGovernmentOfficialCertificate(
 
   // Closing statement
   currentY += 12;
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   doc.setFont('times', 'normal');
   doc.setTextColor(0, 0, 0);
   const issueDate = formatDate(data.certification.issued_at);
@@ -220,38 +249,42 @@ export async function generateGovernmentOfficialCertificate(
   doc.text('Ilocos Norte, Philippines.', bodyX, currentY);
 
   // ===== SIGNATURE SECTION (Government multi-block style) =====
-  currentY = pageHeight - 65;
+  // Add direct spacing after closing statement (simple approach like Classic Formal)
+  currentY += 18;
 
-  // Primary signature (Issuing Officer)
-  const sigX = centerX - 30;
+  // Primary signature (Issuing Officer) - Centered
+  const signatureWidth = 40;
+  const signatureHeight = 14;
+  const signatureX = centerX - (signatureWidth / 2);
+  const signatureLineY = currentY + 12;
 
   // Add signature image
   if (signatureBase64) {
     try {
-      doc.addImage(signatureBase64, 'PNG', sigX, currentY, 25, 8);
+      doc.addImage(signatureBase64, 'PNG', signatureX, signatureLineY - 14, signatureWidth, signatureHeight);
     } catch (error) {
       console.error('Error adding signature:', error);
     }
   }
 
-  currentY += 10;
+  // Signature line (centered)
   doc.setLineWidth(0.5);
   doc.setDrawColor(0, 0, 0);
-  doc.line(sigX - 10, currentY, sigX + 50, currentY);
+  const lineWidth = signatureWidth;
+  doc.line(centerX - lineWidth / 2, signatureLineY, centerX + lineWidth / 2, signatureLineY);
 
-  currentY += 4;
+  // Officer name and title (centered)
   doc.setFontSize(10);
   doc.setFont('times', 'bold');
   doc.setTextColor(0, 0, 0);
-  doc.text(data.certification.issued_by.name.toUpperCase(), centerX, currentY, { align: 'center' });
+  doc.text(data.certification.issued_by.name.toUpperCase(), centerX, signatureLineY + 4, { align: 'center' });
 
-  currentY += 4;
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.setFont('times', 'normal');
-  doc.text(data.certification.issued_by.title, centerX, currentY, { align: 'center' });
+  doc.text(data.certification.issued_by.title, centerX, signatureLineY + 8, { align: 'center' });
 
   // Official seal stamp placeholder (bottom right)
-  currentY = pageHeight - 30;
+  currentY = pageHeight - 25;
   doc.setFontSize(6);
   doc.setFont('times', 'italic');
   doc.setTextColor(200, 200, 200);

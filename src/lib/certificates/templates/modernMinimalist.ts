@@ -13,6 +13,9 @@ import {
   formatDate,
   generateCertificateId,
   truncateText,
+  wrapText,
+  addMultiLineText,
+  calculateTextHeight,
 } from '../shared';
 
 /**
@@ -81,7 +84,7 @@ export async function generateModernMinimalistCertificate(
   doc.line(pageWidth - cornerOffset, pageHeight - cornerOffset - cornerSize, pageWidth - cornerOffset, pageHeight - cornerOffset);
 
   // ===== LOGOS (Centered) =====
-  let currentY = 20;
+  let currentY = 14;
   const logoSize = 20;
   const logoSpacing = 25;
 
@@ -125,7 +128,7 @@ export async function generateModernMinimalistCertificate(
   doc.text('Public Employment Service Office (P.E.S.O.)', centerX, currentY, { align: 'center' });
 
   // ===== CERTIFICATE TITLE =====
-  currentY += 18;
+  currentY += 13;
   doc.setFontSize(26);
   doc.setFont('times', 'bold');
   doc.setTextColor(30, 58, 138); // Navy
@@ -138,7 +141,7 @@ export async function generateModernMinimalistCertificate(
   doc.line(centerX - 60, currentY, centerX + 60, currentY);
 
   // ===== CERTIFICATE BODY =====
-  currentY += 16;
+  currentY += 11;
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(45, 45, 45); // Charcoal
@@ -160,46 +163,73 @@ export async function generateModernMinimalistCertificate(
   doc.line(centerX - nameWidth / 2, currentY, centerX + nameWidth / 2, currentY);
 
   // Completion text
-  currentY += 10;
+  currentY += 8;
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(45, 45, 45);
   doc.text('has successfully completed the training program', centerX, currentY, { align: 'center' });
 
-  // Program Title (Navy, serif)
+  // Program Title (Navy, serif) - Multi-line support
   currentY += 10;
   doc.setFontSize(16);
   doc.setFont('times', 'bold');
   doc.setTextColor(30, 58, 138); // Navy
-  const programTitle = truncateText(doc, data.program.title, pageWidth - 80, 16);
-  doc.text(programTitle, centerX, currentY, { align: 'center' });
+  // Use multi-line wrapping instead of truncation
+  currentY = addMultiLineText(doc, data.program.title, centerX, currentY, pageWidth - 80, 16, 'center', 1.15);
 
-  // ===== PROGRAM DETAILS BOX (More distinct background with border) =====
-  currentY += 10;
-  const boxHeight = 28;
-  const boxWidth = pageWidth - 100;
+  // ===== PROGRAM DETAILS BOX (Dynamic height based on content) =====
+  currentY += 4;
+  const boxWidth = pageWidth - 80;
   const boxX = centerX - boxWidth / 2;
+  const boxStartY = currentY;
 
-  // More visible background with subtle gold border
-  doc.setFillColor(250, 248, 240); // #FAF8F0 More contrast
-  doc.setLineWidth(0.3);
-  doc.setDrawColor(212, 175, 55); // Gold
-  doc.rect(boxX, currentY, boxWidth, boxHeight, 'FD');
-
-  // Details inside box
-  let boxY = currentY + 10;
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(75, 85, 99); // Gray
+  // Calculate content height first
+  let contentHeight = 5; // Top padding (reduced for landscape)
 
   // Date range
   const startDate = formatDate(data.program.start_date);
   const endDate = data.program.end_date ? formatDate(data.program.end_date) : 'Ongoing';
+  contentHeight += 6; // Line height for duration
+
+  // Speaker name
+  if (data.program.speaker_name) {
+    contentHeight += 4;
+  }
+
+  // Skills covered - Calculate height for ALL skills with wrapping
+  if (data.program.skills_covered && data.program.skills_covered.length > 0) {
+    contentHeight += 4; // "Skills:" label
+    const skills = data.program.skills_covered.join(', '); // Show ALL skills
+    const skillsHeight = calculateTextHeight(doc, skills, boxWidth - 20, 9, 1.3);
+    contentHeight += skillsHeight;
+  }
+
+  // Assessment & Attendance
+  if (data.completion.assessment_score !== null || data.completion.attendance_percentage !== null) {
+    contentHeight += 4;
+  }
+
+  contentHeight += 5; // Bottom padding (reduced for landscape)
+
+  // Draw box with calculated height
+  const boxHeight = Math.max(contentHeight, 28); // Minimum 28mm
+  doc.setFillColor(250, 248, 240); // #FAF8F0
+  doc.setLineWidth(0.3);
+  doc.setDrawColor(212, 175, 55); // Gold
+  doc.rect(boxX, boxStartY, boxWidth, boxHeight, 'FD');
+
+  // Details inside box
+  let boxY = boxStartY + 7;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(75, 85, 99); // Gray
+
+  // Date range
   doc.text(`Duration: ${startDate} - ${endDate} (${data.program.duration})`, centerX, boxY, { align: 'center' });
 
   // Speaker name
   if (data.program.speaker_name) {
-    boxY += 6;
+    boxY += 4;
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(30, 58, 138); // Navy
     doc.text(`Facilitated by: ${data.program.speaker_name}`, centerX, boxY, { align: 'center' });
@@ -207,22 +237,23 @@ export async function generateModernMinimalistCertificate(
     doc.setTextColor(75, 85, 99);
   }
 
-  // Skills covered
+  // Skills covered - Display ALL skills with multi-line wrapping
   if (data.program.skills_covered && data.program.skills_covered.length > 0) {
-    boxY += 6;
+    boxY += 4;
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(75, 85, 99);
     doc.text('Skills:', centerX, boxY, { align: 'center' });
     boxY += 5;
     doc.setFont('helvetica', 'normal');
-    const skills = data.program.skills_covered.slice(0, 5).join(', ');
-    const skillsText = truncateText(doc, skills, boxWidth - 20, 10);
-    doc.text(skillsText, centerX, boxY, { align: 'center' });
+    // Show ALL skills (no slicing), join with comma
+    const skills = data.program.skills_covered.join(', ');
+    // Use multi-line wrapping instead of truncation
+    boxY = addMultiLineText(doc, skills, centerX, boxY, boxWidth - 20, 9, 'center', 1.3);
   }
 
   // Assessment & Attendance
   if (data.completion.assessment_score !== null || data.completion.attendance_percentage !== null) {
-    boxY += 6;
+    boxY += 4;
     let metricsText = '';
     if (data.completion.assessment_score !== null) {
       metricsText += `Assessment: ${data.completion.assessment_score.toFixed(1)}%`;
@@ -232,12 +263,16 @@ export async function generateModernMinimalistCertificate(
       metricsText += `Attendance: ${data.completion.attendance_percentage.toFixed(1)}%`;
     }
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 58, 138); // Navy instead of green
+    doc.setTextColor(30, 58, 138); // Navy
     doc.text(metricsText, centerX, boxY, { align: 'center' });
   }
 
+  // Update currentY to after the box
+  currentY = boxStartY + boxHeight;
+
   // ===== FOOTER SECTION =====
-  currentY = pageHeight - 40;
+  // Add direct spacing after details box (reduced for landscape orientation)
+  currentY += 3;
 
   // Signature section
   const signatureWidth = 40;
@@ -271,21 +306,24 @@ export async function generateModernMinimalistCertificate(
   doc.setTextColor(107, 114, 128); // Gray
   doc.text(data.certification.issued_by.title, centerX, signatureLineY + 9, { align: 'center' });
 
-  // Certificate ID & Issue Date
-  currentY = pageHeight - 12;
+  // Certificate ID & Issue Date (positioned after officer title with breathing room)
+  const certIdY = signatureLineY + 14;
   doc.setFontSize(8);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(156, 163, 175); // Light gray
   const certId = data.certification.certificate_id || generateCertificateId();
   const issueDate = formatDate(data.certification.issued_at);
-  doc.text(`Certificate ID: ${certId} • Issued on ${issueDate}`, centerX, currentY, { align: 'center' });
+  doc.text(`Certificate ID: ${certId} • Issued on ${issueDate}`, centerX, certIdY, { align: 'center' });
 
-  // Elegant double footer line
+  // Elegant double footer line (positioned below cert ID)
+  const footerLineY1 = certIdY + 6;  // 6mm below cert ID
+  const footerLineY2 = certIdY + 7;  // 1mm spacing between lines
+
   doc.setLineWidth(0.5);
   doc.setDrawColor(212, 175, 55); // Gold
-  doc.line(35, pageHeight - 18, pageWidth - 35, pageHeight - 18);
+  doc.line(35, footerLineY1, pageWidth - 35, footerLineY1);
   doc.setLineWidth(0.2);
-  doc.line(35, pageHeight - 17, pageWidth - 35, pageHeight - 17);
+  doc.line(35, footerLineY2, pageWidth - 35, footerLineY2);
 
   // Return PDF as Uint8Array
   return new Uint8Array(doc.output('arraybuffer'));
