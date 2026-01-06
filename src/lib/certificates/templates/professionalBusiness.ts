@@ -13,6 +13,8 @@ import {
   formatDate,
   generateCertificateId,
   truncateText,
+  calculateTextHeight,
+  wrapText,
 } from '../shared';
 
 /**
@@ -151,13 +153,42 @@ export async function generateProfessionalBusinessCertificate(
   const detailsBoxWidth = pageWidth - 100;
   const detailsBoxX = centerX - detailsBoxWidth / 2;
   const rowHeight = 8;
-
-  // Background for details section
-  doc.setFillColor(249, 250, 251); // Very light gray
-  doc.rect(detailsBoxX, currentY, detailsBoxWidth, 38, 'F');
-
-  currentY += 8;
+  const boxStartY = currentY;
   const labelX = detailsBoxX + 20;
+
+  // Calculate content height first (dynamic based on content)
+  let contentHeight = 8; // Top padding
+
+  // Duration row
+  contentHeight += rowHeight;
+
+  // Speaker row (if present)
+  if (data.program.speaker_name) {
+    contentHeight += rowHeight;
+  }
+
+  // Skills row - Calculate height for ALL skills with wrapping
+  if (data.program.skills_covered && data.program.skills_covered.length > 0) {
+    contentHeight += rowHeight; // For label row
+    const skills = data.program.skills_covered.join(', '); // Show ALL skills
+    const skillsHeight = calculateTextHeight(doc, skills, detailsBoxWidth - 60, 9, 1.2);
+    contentHeight += skillsHeight - rowHeight; // Add extra height beyond first row
+  }
+
+  // Performance row (if present)
+  if (data.completion.assessment_score !== null || data.completion.attendance_percentage !== null) {
+    contentHeight += rowHeight;
+  }
+
+  contentHeight += 4; // Bottom padding
+
+  // Draw box with calculated height
+  const boxHeight = Math.max(contentHeight, 38); // Minimum 38mm
+  doc.setFillColor(249, 250, 251); // Very light gray
+  doc.rect(detailsBoxX, boxStartY, detailsBoxWidth, boxHeight, 'F');
+
+  // Start rendering content
+  currentY = boxStartY + 8;
 
   // Duration
   doc.setFontSize(9);
@@ -183,7 +214,7 @@ export async function generateProfessionalBusinessCertificate(
     doc.text(data.program.speaker_name, labelX + 25, currentY);
   }
 
-  // Skills
+  // Skills - Display ALL skills with multi-line wrapping
   if (data.program.skills_covered && data.program.skills_covered.length > 0) {
     currentY += rowHeight;
     doc.setFont('helvetica', 'bold');
@@ -192,9 +223,16 @@ export async function generateProfessionalBusinessCertificate(
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(31, 41, 59);
-    const skills = data.program.skills_covered.slice(0, 5).join(', ');
-    const skillsText = truncateText(doc, skills, detailsBoxWidth - 60, 9);
-    doc.text(skillsText, labelX + 25, currentY);
+    const skills = data.program.skills_covered.join(', '); // Show ALL skills (no slicing)
+    // Use multi-line wrapping instead of truncation
+    const { lines } = wrapText(doc, skills, detailsBoxWidth - 60, 9, 1.2);
+    let skillsY = currentY;
+    lines.forEach((line) => {
+      doc.text(line, labelX + 25, skillsY);
+      skillsY += rowHeight;
+    });
+    // Update currentY to reflect actual height used (already at last line position)
+    currentY = skillsY - rowHeight;
   }
 
   // Performance metrics

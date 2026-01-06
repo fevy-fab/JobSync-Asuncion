@@ -13,6 +13,8 @@ import {
   formatDate,
   generateCertificateId,
   truncateText,
+  addMultiLineText,
+  calculateTextHeight,
 } from '../shared';
 
 /**
@@ -162,16 +164,42 @@ export async function generateColorfulAchievementCertificate(
 
   // ===== ACHIEVEMENT DETAILS BOX =====
   currentY += 13;
-  const boxHeight = 36;
   const boxWidth = pageWidth - 120;
   const boxX = centerX - boxWidth / 2;
   const boxStartY = currentY;
 
-  // Warm background with elegant border
+  // Calculate content height first (dynamic based on content)
+  let contentHeight = 10; // Top padding
+
+  // Duration line
+  contentHeight += 5;
+
+  // Speaker name (if present)
+  if (data.program.speaker_name) {
+    contentHeight += 5;
+  }
+
+  // Skills covered - Calculate height for ALL skills with wrapping
+  if (data.program.skills_covered && data.program.skills_covered.length > 0) {
+    contentHeight += 6; // Spacing before skills
+    const skills = data.program.skills_covered.join(', '); // Show ALL skills
+    const skillsHeight = calculateTextHeight(doc, skills, boxWidth - 10, 8, 1.2);
+    contentHeight += skillsHeight;
+  }
+
+  // Performance metrics (if present)
+  if (data.completion.assessment_score !== null || data.completion.attendance_percentage !== null) {
+    contentHeight += 5;
+  }
+
+  contentHeight += 5; // Bottom padding
+
+  // Draw box with calculated height
+  const boxHeight = Math.max(contentHeight, 36); // Minimum 36mm
   doc.setFillColor(255, 251, 235); // #FFFBEB Very light warm
   doc.setLineWidth(0.5);
   doc.setDrawColor(201, 168, 106); // Gold
-  doc.roundedRect(boxX, currentY, boxWidth, boxHeight, 2, 2, 'FD');
+  doc.roundedRect(boxX, boxStartY, boxWidth, boxHeight, 2, 2, 'FD');
 
   // Box content
   let boxY = currentY + 10;
@@ -192,14 +220,14 @@ export async function generateColorfulAchievementCertificate(
     doc.setTextColor(60, 60, 60);
   }
 
-  // Skills
+  // Skills - Display ALL skills with multi-line wrapping
   if (data.program.skills_covered && data.program.skills_covered.length > 0) {
     boxY += 6;
     doc.setFontSize(8);
     doc.setTextColor(80, 80, 80);
-    const skills = data.program.skills_covered.slice(0, 5).join(', ');
-    const skillsText = truncateText(doc, skills, boxWidth - 10, 8);
-    doc.text(skillsText, centerX, boxY, { align: 'center' });
+    const skills = data.program.skills_covered.join(', '); // Show ALL skills (no slicing)
+    // Use multi-line wrapping instead of truncation
+    boxY = addMultiLineText(doc, skills, centerX, boxY, boxWidth - 10, 8, 'center', 1.2);
   }
 
   // Performance
