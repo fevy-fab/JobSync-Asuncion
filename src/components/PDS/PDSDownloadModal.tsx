@@ -300,7 +300,7 @@ export function PDSDownloadModal({ isOpen, onClose, pdsId }: PDSDownloadModalPro
             {selectedFormat === 'template'
               ? '🆕 Uses the ACTUAL CS Form 212 PDF template file with data overlaid at precise coordinates. This is the real government PDF form with your information filled in programmatically. Most authentic format available!'
               : selectedFormat === 'official'
-              ? 'Programmatically generated CSC-compliant PDF matching official CS Form No. 212, Revised 2025 layout. Fast generation with perfect formatting.'
+              ? 'Official CS Form No. 212, Revised 2025 using PDF template overlay. Data is precisely positioned on the authentic government form template with perfect field alignment. Recommended for CSC compliance and government submissions.'
               : selectedFormat === 'csc'
               ? 'Box-based layout format with structured sections. Provides a traditional form-style presentation with clearly defined boxes and fields. Ideal for formal submissions and traditional document formats.'
               : selectedFormat === 'excel'

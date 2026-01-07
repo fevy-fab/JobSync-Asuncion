@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server';
 import { generatePDSPDF } from '@/lib/pds/pdfGenerator';
 import { generateCSCFormatPDF } from '@/lib/pds/pdfGeneratorCSC';
 import { generateRealTemplatePDS } from '@/lib/pds/pdfRealTemplateGenerator';
+import { generateOfficialPDF } from '@/lib/pds/pdfGeneratorOfficial';
 import { generatePDSExcel, generatePDSFilename } from '@/lib/pds/pdsExcelGenerator';
 import { transformPDSFromDatabase } from '@/lib/utils/dataTransformers';
 import fs from 'fs';
@@ -186,19 +187,38 @@ export async function GET(
         pdfBufferNode.byteOffset + pdfBufferNode.byteLength
       ) as ArrayBuffer;
       formatLabel = 'Official_Template';
+    } else if (format === 'official') {
+      // 'official' format uses the new CSC Form 212 2025 PDF template generator
+      const result = await generateOfficialPDF(transformedPDSData, {
+        includeSignature,
+        useCurrentDate,
+        returnBytes: true,
+      });
+      if (result instanceof Uint8Array) {
+        pdfBuffer = result.buffer.slice(
+          result.byteOffset,
+          result.byteOffset + result.byteLength
+        ) as ArrayBuffer;
+      } else {
+        return NextResponse.json(
+          { success: false, error: 'Failed to generate Official PDF' },
+          { status: 500 }
+        );
+      }
+      formatLabel = 'Official_CSC_2025';
     } else {
       // Other formats use jsPDF generators
       let doc;
 
-      if (format === 'official' || format === 'csc') {
-        // Both 'official' and 'csc' use the CSC format generator (compliant with CS Form 212)
+      if (format === 'csc') {
+        // 'csc' uses the CSC format generator (box-based layout)
         doc = await generateCSCFormatPDF(
           transformedPDSData,
           includeSignature,
           true,
           useCurrentDate
         );
-        formatLabel = format === 'official' ? 'Official_CSC' : 'CSC';
+        formatLabel = 'CSC';
       } else {
         // 'modern' format uses the modern table-based generator
         doc = await generatePDSPDF(
