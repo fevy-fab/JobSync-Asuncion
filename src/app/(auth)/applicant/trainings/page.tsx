@@ -957,7 +957,7 @@ export default function TrainingsPage() {
                         const skillsToShow = showAll ? program.skills_covered : program.skills_covered.slice(0, 5);
 
                         return (
-                          <>
+                          <React.Fragment>
                             {skillsToShow.map((skill, idx) => (
                               <Badge key={idx} size="sm" variant="default">
                                 {skill}
@@ -972,7 +972,7 @@ export default function TrainingsPage() {
                                 {isExpanded ? 'Show less' : `+${totalCount - skillsToShow.length} more`}
                               </button>
                             )}
-                          </>
+                          </React.Fragment>
                         );
                       })()}
                     </div>

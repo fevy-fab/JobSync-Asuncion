@@ -5,6 +5,8 @@ import { ModernModal, Button } from '@/components/ui';
 import { Award, CheckCircle, XCircle, Loader2, Eye, AlertCircle, FileCheck, CheckSquare, Square } from 'lucide-react';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/lib/utils/errorMessages';
+import { CertificateTemplate } from '@/types/certificate.types';
+import TemplateSelector from './TemplateSelector';
 
 interface TrainingApplication {
   id: string;
@@ -57,6 +59,7 @@ export default function BulkCertificateModal({
   const [includeSignature, setIncludeSignature] = useState(false);
   const [hasSignature, setHasSignature] = useState<boolean>(false);
   const [signatureLoading, setSignatureLoading] = useState<boolean>(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<CertificateTemplate>('classic');
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -126,6 +129,7 @@ export default function BulkCertificateModal({
         body: JSON.stringify({
           application_id: applicationId,
           include_signature: includeSignature,
+          template: selectedTemplate,
         }),
       });
 
@@ -139,8 +143,8 @@ export default function BulkCertificateModal({
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
 
-      // Clean up after opening
-      setTimeout(() => URL.revokeObjectURL(url), 100);
+      // Clean up after opening (5 seconds to allow PDF viewer to load)
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (error: any) {
       console.error('Error previewing certificate:', error);
       showToast(getErrorMessage(error), 'error');
@@ -178,6 +182,7 @@ export default function BulkCertificateModal({
           body: JSON.stringify({
             application_id: appId,
             include_signature: includeSignature,
+            template: selectedTemplate,
           }),
         });
 
@@ -365,6 +370,18 @@ export default function BulkCertificateModal({
                 </p>
               </div>
             </label>
+          </div>
+
+          {/* Template Selection */}
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+            <label className="block text-sm font-medium text-gray-900 mb-3">
+              Certificate Template
+            </label>
+            <TemplateSelector
+              selectedTemplate={selectedTemplate}
+              onTemplateChange={setSelectedTemplate}
+              showPreview={false}
+            />
           </div>
 
           {/* Selection Controls */}

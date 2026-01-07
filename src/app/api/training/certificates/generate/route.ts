@@ -189,8 +189,8 @@ export async function POST(request: NextRequest) {
     };
 
     // 9. Generate PDF with template selection
-    // Use program's template if specified, fallback to request template or default 'classic'
-    const selectedTemplate = program.certificate_template || template || 'classic';
+    // Prioritize user's manual selection, then program's default, then fallback to 'classic'
+    const selectedTemplate = template || program.certificate_template || 'classic';
 
     let pdfBytes: Uint8Array;
     try {
@@ -246,6 +246,7 @@ export async function POST(request: NextRequest) {
         status_history: updatedHistory,
         certificate_url: filePath,
         certificate_issued_at: certificateData.certification.issued_at,
+        certificate_template: selectedTemplate,
         updated_at: new Date().toISOString(),
       })
       .eq('id', application_id);

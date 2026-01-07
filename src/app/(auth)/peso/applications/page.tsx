@@ -384,8 +384,8 @@ export default function PESOApplicationsPage() {
       const url = URL.createObjectURL(blob);
       window.open(url, '_blank');
 
-      // Clean up the URL after opening
-      setTimeout(() => URL.revokeObjectURL(url), 100);
+      // Clean up the URL after opening (5 seconds to allow PDF viewer to load)
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (error: any) {
       console.error('Error previewing certificate:', error);
       showToast(getErrorMessage(error), 'error');

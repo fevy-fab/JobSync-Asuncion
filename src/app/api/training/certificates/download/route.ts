@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     // 3. Verify that the user owns this application (security check)
     const { data: application, error: fetchError } = await supabase
       .from('training_applications')
-      .select('id, applicant_id, certificate_url, status')
+      .select('id, applicant_id, certificate_url, certificate_template, status')
       .eq('id', application_id)
       .single();
 
