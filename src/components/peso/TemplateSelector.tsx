@@ -34,18 +34,17 @@ const TEMPLATE_PREVIEWS = {
     </div>
   ),
   modern: (
-    <div className="h-40 bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <div className="h-12 bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center gap-2">
-        <div className="w-4 h-4 rounded-full bg-white/80"></div>
-        <div className="w-4 h-4 rounded-full bg-white/80"></div>
-        <div className="w-4 h-4 rounded-full bg-white/80"></div>
-      </div>
-      <div className="p-4 text-center">
-        <p className="text-sm font-bold text-blue-600">CERTIFICATE OF COMPLETION</p>
-        <div className="mt-2 h-px bg-blue-400 w-1/2 mx-auto"></div>
-        <p className="text-xs text-gray-500 mt-2">Modern Minimalist</p>
-        <div className="mt-2 bg-gray-50 rounded p-2">
-          <p className="text-[10px] text-gray-600">Clean & Contemporary</p>
+    <div className="h-40 bg-slate-50 border-2 border-blue-900 rounded-lg p-4 flex flex-col items-center justify-center relative">
+      <div className="absolute top-2 left-2 w-4 h-4 border-l-2 border-t-2 border-yellow-600"></div>
+      <div className="absolute top-2 right-2 w-4 h-4 border-r-2 border-t-2 border-yellow-600"></div>
+      <div className="absolute bottom-2 left-2 w-4 h-4 border-l-2 border-b-2 border-yellow-600"></div>
+      <div className="absolute bottom-2 right-2 w-4 h-4 border-r-2 border-b-2 border-yellow-600"></div>
+      <div className="text-center">
+        <p className="text-sm font-bold text-blue-900">CERTIFICATE OF COMPLETION</p>
+        <div className="mt-2 h-px bg-yellow-600 w-1/2 mx-auto"></div>
+        <p className="text-xs text-gray-600 mt-2">Modern Minimalist</p>
+        <div className="mt-2 bg-amber-50 border border-yellow-600 rounded p-2">
+          <p className="text-[10px] text-gray-700">Clean & Contemporary</p>
         </div>
       </div>
     </div>
@@ -66,35 +65,35 @@ const TEMPLATE_PREVIEWS = {
     </div>
   ),
   colorful: (
-    <div className="h-40 bg-gradient-to-br from-purple-100 via-pink-100 to-orange-100 border-4 border-purple-500 rounded-lg p-3 relative overflow-hidden">
-      <div className="absolute top-1 left-1 text-yellow-500 text-xl">★</div>
-      <div className="absolute top-1 right-1 text-yellow-500 text-xl">★</div>
-      <div className="absolute bottom-1 left-1 text-yellow-500 text-xl">★</div>
-      <div className="absolute bottom-1 right-1 text-yellow-500 text-xl">★</div>
+    <div className="h-40 bg-amber-50 border-4 border-rose-900 rounded-lg p-3 relative overflow-hidden">
+      <div className="absolute top-1 left-1 text-yellow-700 text-xl">❖</div>
+      <div className="absolute top-1 right-1 text-yellow-700 text-xl">❖</div>
+      <div className="absolute bottom-1 left-1 text-yellow-700 text-xl">❖</div>
+      <div className="absolute bottom-1 right-1 text-yellow-700 text-xl">❖</div>
       <div className="flex flex-col items-center justify-center h-full">
-        <p className="text-lg font-bold text-pink-600">CERTIFICATE</p>
-        <p className="text-xs font-bold text-purple-600">OF ACHIEVEMENT</p>
+        <p className="text-lg font-bold text-rose-900">CERTIFICATE</p>
+        <p className="text-xs font-bold text-rose-800">OF ACHIEVEMENT</p>
+        <div className="mt-2 h-px bg-yellow-700 w-1/3 mx-auto"></div>
         <div className="mt-2 flex gap-1">
-          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-          <div className="w-3 h-3 rounded-full bg-pink-500"></div>
-          <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+          <div className="w-3 h-3 rounded-full bg-rose-900 border border-yellow-700"></div>
+          <div className="w-3 h-3 rounded-full bg-yellow-700 border border-rose-900"></div>
         </div>
-        <p className="text-[10px] text-gray-600 mt-2">★ CONGRATULATIONS! ★</p>
+        <p className="text-[10px] text-gray-600 mt-2">❖ CONGRATULATIONS! ❖</p>
       </div>
     </div>
   ),
   professional: (
-    <div className="h-40 bg-white border-l-4 border-teal-500 rounded-lg p-4 flex flex-col">
+    <div className="h-40 bg-white border-2 border-teal-500 rounded-lg p-4 flex flex-col items-center justify-center">
       <div className="flex gap-2 mb-3">
         <div className="w-5 h-5 rounded-full bg-teal-500"></div>
         <div className="w-5 h-5 rounded-full bg-gray-400"></div>
         <div className="w-5 h-5 rounded-full bg-teal-300"></div>
       </div>
-      <div className="flex-1">
+      <div className="flex-1 text-center">
         <p className="text-sm font-bold text-gray-800">CERTIFICATE OF COMPLETION</p>
-        <div className="h-px bg-teal-500 w-20 mt-1"></div>
+        <div className="h-px bg-teal-500 w-20 mt-1 mx-auto"></div>
         <p className="text-[10px] text-gray-500 mt-2">Professional Training Certification</p>
-        <div className="mt-2 bg-gray-50 border-l-2 border-teal-500 p-2">
+        <div className="mt-2 bg-gray-50 border border-gray-200 p-2 rounded">
           <p className="text-[9px] text-gray-600">Professional Business</p>
         </div>
       </div>
