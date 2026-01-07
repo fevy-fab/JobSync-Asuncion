@@ -93,7 +93,7 @@ export async function generateClassicFormalCertificate(
 
   currentY += 5;
   doc.setFontSize(10);
-  doc.text('PROVINCE OF ILOCOS NORTE', centerX, currentY, { align: 'center' });
+  doc.text('PROVINCE OF DAVAO DEL NORTE', centerX, currentY, { align: 'center' });
 
   currentY += 5;
   doc.setFontSize(11);
@@ -199,22 +199,6 @@ export async function generateClassicFormalCertificate(
     const skills = data.program.skills_covered.join(' • ');
     // Use multi-line wrapping instead of truncation
     currentY = addMultiLineText(doc, skills, centerX, currentY, pageWidth - 60, 10, 'center', 1.3);
-  }
-
-  // Assessment & Attendance
-  currentY += 10;
-  doc.setFontSize(10);
-  doc.setFont('times', 'normal');
-  let metricsText = '';
-  if (data.completion.assessment_score !== null) {
-    metricsText += `Assessment Score: ${data.completion.assessment_score.toFixed(1)}%`;
-  }
-  if (data.completion.attendance_percentage !== null) {
-    if (metricsText) metricsText += ' • ';
-    metricsText += `Attendance: ${data.completion.attendance_percentage.toFixed(1)}%`;
-  }
-  if (metricsText) {
-    doc.text(metricsText, centerX, currentY, { align: 'center' });
   }
 
   // ===== FOOTER SECTION =====

@@ -104,7 +104,7 @@ export async function generateColorfulAchievementCertificate(
 
   currentY += 4;
   doc.setFontSize(8);
-  doc.text('PROVINCE OF ILOCOS NORTE • MUNICIPALITY OF ASUNCION', centerX, currentY, { align: 'center' });
+  doc.text('PROVINCE OF DAVAO DEL NORTE • MUNICIPALITY OF ASUNCION', centerX, currentY, { align: 'center' });
 
   currentY += 4;
   doc.setFontSize(8);
@@ -228,23 +228,6 @@ export async function generateColorfulAchievementCertificate(
     const skills = data.program.skills_covered.join(', '); // Show ALL skills (no slicing)
     // Use multi-line wrapping instead of truncation
     boxY = addMultiLineText(doc, skills, centerX, boxY, boxWidth - 10, 8, 'center', 1.2);
-  }
-
-  // Performance
-  if (data.completion.assessment_score !== null || data.completion.attendance_percentage !== null) {
-    boxY += 5;
-    doc.setFontSize(9);
-    doc.setFont('times', 'bold');
-    let metricsText = '';
-    if (data.completion.assessment_score !== null) {
-      metricsText += `Assessment: ${data.completion.assessment_score.toFixed(1)}%`;
-    }
-    if (data.completion.attendance_percentage !== null) {
-      if (metricsText) metricsText += ' • ';
-      metricsText += `Attendance: ${data.completion.attendance_percentage.toFixed(1)}%`;
-    }
-    doc.setTextColor(139, 58, 98); // Burgundy
-    doc.text(metricsText, centerX, boxY, { align: 'center' });
   }
 
   // ===== FOOTER SECTION =====

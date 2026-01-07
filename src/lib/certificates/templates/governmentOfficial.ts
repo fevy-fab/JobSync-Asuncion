@@ -81,7 +81,7 @@ export async function generateGovernmentOfficialCertificate(
 
   currentY += 5;
   doc.setFontSize(9);
-  doc.text('PROVINCE OF ILOCOS NORTE', centerX, currentY, { align: 'center' });
+  doc.text('PROVINCE OF DAVAO DEL NORTE', centerX, currentY, { align: 'center' });
 
   currentY += 5;
   doc.setFontSize(10);
@@ -149,7 +149,7 @@ export async function generateGovernmentOfficialCertificate(
 
   const startDate = formatDate(data.program.start_date);
   const endDate = data.program.end_date ? formatDate(data.program.end_date) : 'Present';
-  const para3 = `of the Municipality of Asuncion, Province of Ilocos Norte, from ${startDate} to ${endDate}.`;
+  const para3 = `of the Municipality of Asuncion, Province of Davao del Norte, from ${startDate} to ${endDate}.`;
   doc.text(para3, bodyX, currentY, { maxWidth: bodyWidth });
 
   // Program details box - Dynamic height
@@ -218,26 +218,6 @@ export async function generateGovernmentOfficialCertificate(
   // Update currentY to after box
   currentY = boxStartY + boxHeight;
 
-  // Performance metrics (outside of box)
-  if (data.completion.assessment_score !== null || data.completion.attendance_percentage !== null) {
-    currentY += 8;
-    doc.setFontSize(9);
-    doc.setFont('times', 'bold');
-    doc.setTextColor(30, 58, 138);
-    doc.text('PERFORMANCE RATING', bodyX, currentY);
-
-    currentY += 5;
-    doc.setFont('times', 'normal');
-    doc.setTextColor(0, 0, 0);
-    if (data.completion.assessment_score !== null) {
-      doc.text(`Assessment Score: ${data.completion.assessment_score.toFixed(1)}%`, bodyX + 5, currentY);
-      currentY += 5;
-    }
-    if (data.completion.attendance_percentage !== null) {
-      doc.text(`Attendance: ${data.completion.attendance_percentage.toFixed(1)}%`, bodyX + 5, currentY);
-    }
-  }
-
   // Closing statement
   currentY += 12;
   doc.setFontSize(11);
@@ -246,7 +226,7 @@ export async function generateGovernmentOfficialCertificate(
   const issueDate = formatDate(data.certification.issued_at);
   doc.text(`This certificate is issued this ${issueDate} at the Municipality of Asuncion,`, bodyX, currentY, { maxWidth: bodyWidth });
   currentY += 5;
-  doc.text('Ilocos Norte, Philippines.', bodyX, currentY);
+  doc.text('Davao del Norte, Philippines.', bodyX, currentY);
 
   // ===== SIGNATURE SECTION (Government multi-block style) =====
   // Add direct spacing after closing statement (simple approach like Classic Formal)

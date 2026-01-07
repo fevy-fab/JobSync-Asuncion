@@ -119,7 +119,7 @@ export async function generateModernMinimalistCertificate(
 
   currentY += 5;
   doc.setFontSize(10);
-  doc.text('PROVINCE OF ILOCOS NORTE • MUNICIPALITY OF ASUNCION', centerX, currentY, { align: 'center' });
+  doc.text('PROVINCE OF DAVAO DEL NORTE • MUNICIPALITY OF ASUNCION', centerX, currentY, { align: 'center' });
 
   currentY += 5;
   doc.setFontSize(9);
@@ -249,22 +249,6 @@ export async function generateModernMinimalistCertificate(
     const skills = data.program.skills_covered.join(', ');
     // Use multi-line wrapping instead of truncation
     boxY = addMultiLineText(doc, skills, centerX, boxY, boxWidth - 20, 9, 'center', 1.3);
-  }
-
-  // Assessment & Attendance
-  if (data.completion.assessment_score !== null || data.completion.attendance_percentage !== null) {
-    boxY += 4;
-    let metricsText = '';
-    if (data.completion.assessment_score !== null) {
-      metricsText += `Assessment: ${data.completion.assessment_score.toFixed(1)}%`;
-    }
-    if (data.completion.attendance_percentage !== null) {
-      if (metricsText) metricsText += ' | ';
-      metricsText += `Attendance: ${data.completion.attendance_percentage.toFixed(1)}%`;
-    }
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(30, 58, 138); // Navy
-    doc.text(metricsText, centerX, boxY, { align: 'center' });
   }
 
   // Update currentY to after the box

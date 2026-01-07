@@ -95,7 +95,7 @@ export async function generateProfessionalBusinessCertificate(
 
   currentY += 4;
   doc.setFontSize(8);
-  doc.text('PROVINCE OF ILOCOS NORTE', centerX, currentY, { align: 'center' });
+  doc.text('PROVINCE OF DAVAO DEL NORTE', centerX, currentY, { align: 'center' });
 
   currentY += 4;
   doc.text('MUNICIPALITY OF ASUNCION', centerX, currentY, { align: 'center' });
@@ -242,26 +242,6 @@ export async function generateProfessionalBusinessCertificate(
     });
     // Update currentY to reflect actual height used (already at last line position)
     currentY = skillsY - rowHeight;
-  }
-
-  // Performance metrics
-  if (data.completion.assessment_score !== null || data.completion.attendance_percentage !== null) {
-    currentY += rowHeight;
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(100, 116, 139);
-    doc.text('Performance:', labelX, currentY);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(31, 41, 59);
-    let metricsText = '';
-    if (data.completion.assessment_score !== null) {
-      metricsText += `Assessment ${data.completion.assessment_score.toFixed(1)}%`;
-    }
-    if (data.completion.attendance_percentage !== null) {
-      if (metricsText) metricsText += ' • ';
-      metricsText += `Attendance ${data.completion.attendance_percentage.toFixed(1)}%`;
-    }
-    doc.text(metricsText, labelX + 25, currentY);
   }
 
   // ===== FOOTER SECTION =====
