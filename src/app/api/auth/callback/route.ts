@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
-import { logActivity } from '@/lib/activity-logs';
+import { logActivity } from '@/lib/supabase/activityLogger';
 
 /**
  * Auth Callback Handler
