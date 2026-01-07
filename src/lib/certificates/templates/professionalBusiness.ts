@@ -60,11 +60,6 @@ export async function generateProfessionalBusinessCertificate(
   doc.setDrawColor(200, 200, 200); // Light gray
   doc.rect(10, 10, pageWidth - 20, pageHeight - 20, 'S');
 
-  // ===== SUBTLE LEFT ACCENT (Optional, thin) =====
-  // Very thin teal accent bar (2mm)
-  doc.setFillColor(20, 184, 166); // #14B8A6
-  doc.rect(0, 0, 2, pageHeight, 'F');
-
   // ===== HEADER (Centered) =====
   let currentY = 14;
 

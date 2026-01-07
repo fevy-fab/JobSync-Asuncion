@@ -284,7 +284,7 @@ export async function generateGovernmentOfficialCertificate(
   doc.text(data.certification.issued_by.title, centerX, signatureLineY + 8, { align: 'center' });
 
   // Official seal stamp placeholder (bottom right)
-  currentY = pageHeight - 25;
+  currentY = pageHeight - 40;
   doc.setFontSize(6);
   doc.setFont('times', 'italic');
   doc.setTextColor(200, 200, 200);

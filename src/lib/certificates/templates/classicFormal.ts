@@ -218,23 +218,14 @@ export async function generateClassicFormalCertificate(
   }
 
   // ===== FOOTER SECTION =====
-  currentY = pageHeight - 45;
-
-  // Certificate ID & Issue Date
-  doc.setFontSize(8);
-  doc.setFont('times', 'italic');
-  doc.setTextColor(100, 100, 100);
-  const certId = data.certification.certificate_id || generateCertificateId();
-  const issueDate = formatDate(data.certification.issued_at);
-  doc.text(`Certificate ID: ${certId}`, centerX, currentY, { align: 'center' });
-  doc.text(`Issued on ${issueDate}`, centerX, currentY + 4, { align: 'center' });
+  // Add spacing before footer (flow-based positioning)
+  currentY += 3;
 
   // Signature section
-  currentY += 12;
   const signatureWidth = 40;
   const signatureHeight = 14;
   const signatureX = centerX - (signatureWidth / 2);
-  const signatureLineY = currentY + 12;
+  const signatureLineY = currentY + 4;
 
   // Add signature image if available
   if (signatureBase64) {
@@ -260,6 +251,16 @@ export async function generateClassicFormalCertificate(
   doc.setFontSize(9);
   doc.setFont('times', 'normal');
   doc.text(data.certification.issued_by.title, centerX, signatureLineY + 8, { align: 'center' });
+
+  // Certificate ID & Issue Date (placed after signature)
+  currentY = signatureLineY + 14;
+  doc.setFontSize(8);
+  doc.setFont('times', 'italic');
+  doc.setTextColor(100, 100, 100);
+  const certId = data.certification.certificate_id || generateCertificateId();
+  const issueDate = formatDate(data.certification.issued_at);
+  doc.text(`Certificate ID: ${certId}`, centerX, currentY, { align: 'center' });
+  doc.text(`Issued on ${issueDate}`, centerX, currentY + 4, { align: 'center' });
 
   // Return PDF as Uint8Array
   return new Uint8Array(doc.output('arraybuffer'));

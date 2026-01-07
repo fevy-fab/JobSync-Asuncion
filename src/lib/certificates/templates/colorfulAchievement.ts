@@ -66,8 +66,8 @@ export async function generateColorfulAchievementCertificate(
   doc.setTextColor(201, 168, 106); // Gold
   doc.text('❖', 18, 20);
   doc.text('❖', pageWidth - 22, 20);
-  doc.text('❖', 18, pageHeight - 12);
-  doc.text('❖', pageWidth - 22, pageHeight - 12);
+  doc.text('❖', 18, pageHeight - 15);
+  doc.text('❖', pageWidth - 22, pageHeight - 15);
 
   // ===== LOGOS (Top, Centered) =====
   let currentY = 14;
