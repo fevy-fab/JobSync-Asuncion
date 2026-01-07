@@ -49,18 +49,30 @@ export async function generateProfessionalBusinessCertificate(
   doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, pageWidth, pageHeight, 'F');
 
+  // ===== PROFESSIONAL BORDERS =====
+  // Outer teal border
+  doc.setLineWidth(1);
+  doc.setDrawColor(20, 184, 166); // #14B8A6 Teal
+  doc.rect(8, 8, pageWidth - 16, pageHeight - 16, 'S');
+
+  // Inner light gray border
+  doc.setLineWidth(0.3);
+  doc.setDrawColor(200, 200, 200); // Light gray
+  doc.rect(10, 10, pageWidth - 20, pageHeight - 20, 'S');
+
   // ===== SUBTLE LEFT ACCENT (Optional, thin) =====
   // Very thin teal accent bar (2mm)
   doc.setFillColor(20, 184, 166); // #14B8A6
   doc.rect(0, 0, 2, pageHeight, 'F');
 
   // ===== HEADER (Centered) =====
-  let currentY = 20;
+  let currentY = 14;
 
   // Logo row (centered horizontally)
-  const logoSize = 18;
-  const logoSpacing = 28;
-  const startX = centerX - (logoSpacing * 0.5);
+  const logoSize = 22;
+  const logoSpacing = 24;
+  const totalWidth = logoSize * 2 + logoSpacing;
+  const startX = centerX - (totalWidth / 2);
 
   if (lguSeal) {
     try {
@@ -72,14 +84,14 @@ export async function generateProfessionalBusinessCertificate(
 
   if (pesoLogo) {
     try {
-      doc.addImage(pesoLogo, 'JPEG', startX + logoSpacing, currentY, logoSize, logoSize);
+      doc.addImage(pesoLogo, 'JPEG', startX + logoSize + logoSpacing, currentY, logoSize, logoSize);
     } catch (error) {
       console.error('Error adding PESO logo:', error);
     }
   }
 
   // Header text (centered)
-  currentY += 24;
+  currentY += 32;
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
@@ -185,7 +197,9 @@ export async function generateProfessionalBusinessCertificate(
   // Draw box with calculated height
   const boxHeight = Math.max(contentHeight, 38); // Minimum 38mm
   doc.setFillColor(249, 250, 251); // Very light gray
-  doc.rect(detailsBoxX, boxStartY, detailsBoxWidth, boxHeight, 'F');
+  doc.setLineWidth(0.5);
+  doc.setDrawColor(20, 184, 166); // #14B8A6 Teal border
+  doc.rect(detailsBoxX, boxStartY, detailsBoxWidth, boxHeight, 'FD');
 
   // Start rendering content
   currentY = boxStartY + 8;
@@ -256,28 +270,22 @@ export async function generateProfessionalBusinessCertificate(
   }
 
   // ===== FOOTER SECTION =====
-  currentY = pageHeight - 42;
+  // Position signature section BELOW the details box
+  currentY = boxStartY + boxHeight;
 
-  // Certificate metadata
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(148, 163, 184);
-  const certId = data.certification.certificate_id || generateCertificateId();
-  const issueDate = formatDate(data.certification.issued_at);
-  doc.text(`Certificate ID: ${certId}`, centerX, currentY, { align: 'center' });
-  doc.text(`Issue Date: ${issueDate}`, centerX, currentY + 4, { align: 'center' });
+  // Add professional spacing before signature section
+  currentY += 6;
 
   // Signature section (Centered)
-  currentY += 12;
   const signatureWidth = 40;
-  const signatureHeight = 14;
+  const signatureHeight = 10;
   const signatureX = centerX - (signatureWidth / 2);
-  const signatureLineY = currentY + 12;
+  const signatureLineY = currentY + 4;
 
   // Add signature image
   if (signatureBase64) {
     try {
-      doc.addImage(signatureBase64, 'PNG', signatureX, signatureLineY - 14, signatureWidth, signatureHeight);
+      doc.addImage(signatureBase64, 'PNG', signatureX, signatureLineY - signatureHeight, signatureWidth, signatureHeight);
     } catch (error) {
       console.error('Error adding signature:', error);
     }
@@ -289,16 +297,26 @@ export async function generateProfessionalBusinessCertificate(
   const lineWidth = signatureWidth;
   doc.line(centerX - lineWidth / 2, signatureLineY, centerX + lineWidth / 2, signatureLineY);
 
-  // Officer details
+  // Officer details (centered)
   doc.setFontSize(10);
   doc.setFont('times', 'bold');
   doc.setTextColor(31, 41, 59);
-  doc.text(data.certification.issued_by.name, centerX, signatureLineY + 5, { align: 'center' });
+  doc.text(data.certification.issued_by.name, centerX, signatureLineY + 3, { align: 'center' });
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(100, 116, 139);
-  doc.text(data.certification.issued_by.title, centerX, signatureLineY + 9, { align: 'center' });
+  doc.text(data.certification.issued_by.title, centerX, signatureLineY + 7, { align: 'center' });
+
+  // Certificate metadata (right-aligned, side-by-side with officer)
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(148, 163, 184);
+  const certId = data.certification.certificate_id || generateCertificateId();
+  const issueDate = formatDate(data.certification.issued_at);
+  const rightX = pageWidth - 15; // 15mm from right edge
+  doc.text(`Certificate ID: ${certId}`, rightX, signatureLineY + 3, { align: 'right' });
+  doc.text(`Issued on ${issueDate}`, rightX, signatureLineY + 7, { align: 'right' });
 
   // Return PDF as Uint8Array
   return new Uint8Array(doc.output('arraybuffer'));
